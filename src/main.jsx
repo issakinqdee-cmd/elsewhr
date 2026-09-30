@@ -46,6 +46,16 @@ function Icon({ name, size = 18, alt = "" }) {
   return <img className="ui-icon" src={png} onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = svg; }} width={size} height={size} alt={alt} aria-hidden={!alt} />;
 }
 
+function BrandMark({ size = 28 }) {
+  return (
+    <span className="brand-mark" style={{ width: size, height: size }}>
+      <svg viewBox="0 0 28 28" width={Math.round(size * 0.58)} height={Math.round(size * 0.58)} viewBox="0 0 28 28" aria-hidden="true">
+        <path fill="currentColor" d="M4 4h19l-5 5H10v3h10l-5 4H10v3h13l-5 5H4z" />
+      </svg>
+    </span>
+  );
+}
+
 const PAGE_ORDER = ["home", "random", "discover", "connections", "messages", "rooms"];
 
 function initials(person) {
@@ -844,7 +854,7 @@ function App() {
           <span className="welcome-dot dot-a" />
           <span className="welcome-dot dot-b" />
           <span className="welcome-dot dot-c" />
-          <div className="welcome-logo">E</div>
+          <div className="welcome-logo"><BrandMark size={58} /></div>
         </div>
         <div className="welcome-wordmark">ELSEWHR</div>
         <div className="welcome-tag">GO SOMEWHERE ELSE.</div>
@@ -856,7 +866,7 @@ function App() {
     return (
       <div className="auth-gate">
         <div className="auth-gate-inner">
-          <div className="auth-gate-logo"><span className="brand-mark">E</span><strong>ELSEWHR</strong></div>
+          <div className="auth-gate-logo"><BrandMark size={34} /><strong>ELSEWHR</strong></div>
           <span className="eyebrow">ELSEWHR</span>
           <h1>Connecting.</h1>
           <p>Checking your live session.</p>
@@ -931,7 +941,7 @@ function App() {
       <div className="app-shell">
         <aside className="sidebar">
           <button className="brand" onClick={() => navigateTo("home")}>
-            <span className="brand-mark">E</span><span>ELSEWHR</span>
+            <BrandMark /><span>ELSEWHR</span>
           </button>
 
           <div className="side-section">
