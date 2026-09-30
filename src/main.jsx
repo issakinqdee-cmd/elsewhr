@@ -2035,6 +2035,7 @@ function LiveChat({
   activeConnection,
   isPlus,
   onShowPlus,
+  onNotify,
   activeMessages,
   authUser,
   message,
@@ -2061,6 +2062,18 @@ function LiveChat({
 }) {
   const reactionChoices = ["❤️", "😂", "🔥", "😍", "😮", "👍"];
   const byId = new Map(activeMessages.map(item => [item.id, item]));
+  const [attachmentFile, setAttachmentFile] = useState(null);
+  const [attachmentPreview, setAttachmentPreview] = useState("");
+
+  useEffect(() => {
+    if (!attachmentFile) {
+      setAttachmentPreview("");
+      return undefined;
+    }
+    const url = URL.createObjectURL(attachmentFile);
+    setAttachmentPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [attachmentFile]);
   const gameChannelRef = useRef(null);
   const reactionTimerRef = useRef(null);
   const [showTogetherGames, setShowTogetherGames] = useState(false);
@@ -2069,6 +2082,7 @@ function LiveChat({
   const [ttt, setTtt] = useState({ board: Array(9).fill(""), turn: null, starterId: null, winner: null });
   const [rps, setRps] = useState({ self: null, opponent: null, opponentName: "", result: "" });
   const [reactionDuel, setReactionDuel] = useState({ status: "idle", start: 0, self: null, opponent: null, opponentName: "" });
+  const [togetherOpponentId, setTogetherOpponentId] = useState(null);
 
   const togetherGames = [
     { id:"ttt", title:"Tic Tac Toe", desc:"Take the square. Own the row.", icon:"grid-3x3", premium:false },
@@ -2118,14 +2132,23 @@ function LiveChat({
     setShowTogetherGames(false);
     setTogetherGame(gameItem);
     setIncomingInvite(null);
+    setTogetherOpponentId(activeRoom.kind === "group" ? null : (activeOther?.id || null));
     if (invite) return;
 
     if (gameItem.id === "ttt" || gameItem.id === "rps") {
-      resetTogetherState(gameItem.id, authUser.id);
+      resetTogetherState(gameItem.id, activeRoom.kind === "group" ? null : authUser.id);
       sendTogether({
         kind: "invite",
         gameId: gameItem.id,
         fromName: authUser.user_metadata?.display_name || authUser.user_metadata?.username || "Someone",
+        groupRoom: activeRoom.kind === "group",
+      });
+      onNotify?.({
+        type: "game",
+        title: "Game invite sent",
+        body: "Waiting for someone in this chat to join.",
+        roomId: activeRoom.id,
+        icon: "gamepad-2",
       });
     } else if (gameItem.id === "reaction") {
       resetTogetherState("reaction");
@@ -2133,6 +2156,14 @@ function LiveChat({
         kind: "invite",
         gameId: "reaction",
         fromName: authUser.user_metadata?.display_name || authUser.user_metadata?.username || "Someone",
+        groupRoom: activeRoom.kind === "group",
+      });
+      onNotify?.({
+        type: "game",
+        title: "Reaction duel invite sent",
+        body: "Waiting for someone to join the duel.",
+        roomId: activeRoom.id,
+        icon: "zap",
       });
     }
   }
@@ -2147,6 +2178,7 @@ function LiveChat({
     }
     setTogetherGame(item);
     setIncomingInvite(null);
+    setTogetherOpponentId(incomingInvite.from);
     resetTogetherState(item.id, incomingInvite.from);
     const reactionDelay = 1900;
     if (item.id === "reaction") {
@@ -2160,7 +2192,16 @@ function LiveChat({
       gameId: item.id,
       starterId: incomingInvite.from,
       starterName: incomingInvite.fromName || "Player",
+      opponentId: authUser.id,
+      participants: [incomingInvite.from, authUser.id],
       delay: item.id === "reaction" ? reactionDelay : undefined,
+    });
+    onNotify?.({
+      type: "game",
+      title: "Game started",
+      body: item.title + " is live.",
+      roomId: activeRoom.id,
+      icon: item.icon || "gamepad-2",
     });
   }
 
@@ -2175,6 +2216,7 @@ function LiveChat({
     setTogetherGame(null);
     setShowTogetherGames(false);
     setIncomingInvite(null);
+    setTogetherOpponentId(null);
     setTtt({ board: Array(9).fill(""), turn: null, starterId: null, winner: null });
     setRps({ self: null, opponent: null, opponentName: "", result: "" });
     setReactionDuel({ status: "idle", start: 0, self: null, opponent: null, opponentName: "" });
@@ -2188,7 +2230,7 @@ function LiveChat({
     const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
     const winningLine = wins.find(([a,b,c]) => next[a] && next[a] === next[b] && next[a] === next[c]);
     const winner = winningLine ? authUser.id : next.every(Boolean) ? "draw" : null;
-    const nextTurn = winner ? null : (ttt.turn === activeOther?.id ? authUser.id : activeOther?.id);
+    const nextTurn = winner ? null : (ttt.turn === togetherOpponentId ? authUser.id : togetherOpponentId);
     const nextState = { board: next, turn: nextTurn, starterId: ttt.starterId, winner };
     setTtt(nextState);
     sendTogether({ kind: "ttt_move", state: nextState });
@@ -2224,7 +2266,7 @@ function LiveChat({
   }
 
   useEffect(() => {
-    if (!supabase || !activeRoom?.id || activeRoom.kind === "group" || !authUser?.id) return;
+    if (!supabase || !activeRoom?.id || !authUser?.id) return;
     const channel = supabase.channel("elsewhr-together-" + activeRoom.id);
     gameChannelRef.current = channel;
 
@@ -2234,7 +2276,16 @@ function LiveChat({
 
         if (payload.kind === "invite") {
           const item = togetherGames.find(candidate => candidate.id === payload.gameId);
-          if (item) setIncomingInvite({ ...payload, item });
+          if (item) {
+            setIncomingInvite({ ...payload, item });
+            onNotify?.({
+              type: "game",
+              title: "Game invite",
+              body: (payload.fromName || "Someone") + " wants to play " + item.title + ".",
+              roomId: activeRoom.id,
+              icon: item.icon || "gamepad-2",
+            });
+          }
           return;
         }
 
@@ -2245,8 +2296,12 @@ function LiveChat({
         }
 
         if (payload.kind === "start") {
+          const participants = Array.isArray(payload.participants) ? payload.participants : [];
+          if (participants.length && !participants.includes(authUser.id)) return;
           const item = togetherGames.find(candidate => candidate.id === payload.gameId);
           if (!item) return;
+          const peerId = participants.find(id => id !== authUser.id) || payload.from || null;
+          setTogetherOpponentId(peerId);
           setTogetherGame(item);
           setIncomingInvite(null);
           resetTogetherState(item.id, payload.starterId || payload.from);
@@ -2296,6 +2351,7 @@ function LiveChat({
         if (payload.kind === "close") {
           setTogetherGame(null);
           setIncomingInvite(null);
+          setTogetherOpponentId(null);
           if (reactionTimerRef.current) window.clearTimeout(reactionTimerRef.current);
         }
       })
@@ -2325,11 +2381,9 @@ function LiveChat({
           </div>
         </div>
         <div className="chat-header-actions">
-          {activeRoom.kind !== "group" && (
-            <button className="chat-play-button" aria-label="Play together" onClick={() => setShowTogetherGames(true)}>
-              <Icon name="gamepad-2" size={14} /> PLAY
-            </button>
-          )}
+          <button className="chat-play-button" aria-label="Play together" onClick={() => setShowTogetherGames(true)}>
+            <Icon name="gamepad-2" size={14} /> PLAY
+          </button>
           {onSkip && (
             <button className="chat-skip" aria-label="Skip this chat" onClick={onSkip}>
               <Icon name="skip-forward" size={14} /> SKIP
@@ -2423,7 +2477,30 @@ function LiveChat({
                   )}
 
                   <div className={"bubble " + (item.deleted_at ? "deleted-bubble" : "")}>
-                    <span>{item.deleted_at ? "Message deleted" : item.media_type ? item.media_type + " message" : item.body}</span>
+                    {item.deleted_at ? (
+                      <span>Message deleted</span>
+                    ) : item.media_url ? (
+                      <div className="attachment-message">
+                        {item.media_type?.startsWith("image/") ? (
+                          <a href={item.media_url} target="_blank" rel="noreferrer" className="attachment-image-link">
+                            <img src={item.media_url} alt={item.media_name || "Shared image"} className="attachment-image" />
+                          </a>
+                        ) : item.media_type?.startsWith("video/") ? (
+                          <video className="attachment-video" controls preload="metadata" src={item.media_url} />
+                        ) : item.media_type?.startsWith("audio/") ? (
+                          <audio className="attachment-audio" controls src={item.media_url} />
+                        ) : (
+                          <a className="attachment-file" href={item.media_url} target="_blank" rel="noreferrer">
+                            <span className="attachment-file-icon"><Icon name="file-text" size={17} /></span>
+                            <span><strong>{item.media_name || "Attachment"}</strong><small>{item.media_size ? Math.ceil(item.media_size / 1024) + " KB" : "File"}</small></span>
+                            <Icon name="arrow-up-right" size={14} />
+                          </a>
+                        )}
+                        {item.body && <span className="attachment-caption">{item.body}</span>}
+                      </div>
+                    ) : (
+                      <span>{item.body}</span>
+                    )}
                     <small>{timeLabel(item.created_at)}{item.edited_at && !item.deleted_at ? " · edited" : ""}</small>
                   </div>
 
@@ -2490,10 +2567,39 @@ function LiveChat({
         </div>
       )}
 
-      <form className="composer" onSubmit={onSend}>
-        <input value={message} onChange={e => setMessage(e.target.value)} placeholder={editingMessageId ? "Edit message..." : replyToMessage ? "Write your reply..." : "Message..."} autoFocus={Boolean(editingMessageId)} />
-        <button type="button" className="composer-cancel" onClick={() => { if (editingMessageId || replyToMessage) onCancelEdit(); }} disabled={!editingMessageId && !replyToMessage}><Icon name="x" size={15} /></button>
-        <button className="send" aria-label={editingMessageId ? "Save edit" : "Send"} type="submit"><Icon name={editingMessageId ? "check" : "send"} size={16} /></button>
+      {attachmentFile && (
+        <div className="attachment-compose">
+          {attachmentPreview && attachmentFile.type?.startsWith("image/") ? (
+            <img src={attachmentPreview} alt="Attachment preview" />
+          ) : (
+            <div className="attachment-compose-icon"><Icon name={attachmentFile.type?.startsWith("video/") ? "video" : attachmentFile.type?.startsWith("audio/") ? "volume-2" : "file"} size={17} /></div>
+          )}
+          <div><strong>{attachmentFile.name}</strong><small>{Math.max(1, Math.ceil(attachmentFile.size / 1024))} KB</small></div>
+          <button type="button" onClick={() => setAttachmentFile(null)} aria-label="Remove attachment"><Icon name="x" size={14} /></button>
+        </div>
+      )}
+
+      <form className="composer" onSubmit={async event => {
+        if (attachmentFile) {
+          event.preventDefault();
+          if (attachmentBusy) return;
+          await onSendAttachment?.(attachmentFile, message);
+          setAttachmentFile(null);
+          return;
+        }
+        onSend(event);
+      }}>
+        <input ref={input => { if (input) input._elsewhrFileInput = input; }} id={"attachment-input-" + activeRoom.id} className="attachment-file-input" type="file" accept="image/*,video/*,audio/*,.pdf,.txt,.zip,.doc,.docx,.xls,.xlsx" onChange={event => {
+          const file = event.target.files?.[0] || null;
+          if (file) setAttachmentFile(file);
+          event.target.value = "";
+        }} />
+        <button type="button" className="composer-attach" aria-label="Attach file" onClick={() => document.getElementById("attachment-input-" + activeRoom.id)?.click()}>
+          <Icon name="paperclip" size={16} />
+        </button>
+        <input value={message} onChange={e => setMessage(e.target.value)} placeholder={editingMessageId ? "Edit message..." : attachmentFile ? "Add a caption..." : replyToMessage ? "Write your reply..." : "Message..."} autoFocus={Boolean(editingMessageId)} />
+        <button type="button" className="composer-cancel" onClick={() => { if (attachmentFile) setAttachmentFile(null); else if (editingMessageId || replyToMessage) onCancelEdit(); }} disabled={!attachmentFile && !editingMessageId && !replyToMessage}><Icon name="x" size={15} /></button>
+        <button className="send" aria-label={attachmentFile ? "Send attachment" : editingMessageId ? "Save edit" : "Send"} type="submit" disabled={attachmentBusy}><Icon name={attachmentBusy ? "loader-circle" : editingMessageId ? "check" : "send"} size={16} /></button>
       </form>
 
       <div className="chat-actions">
