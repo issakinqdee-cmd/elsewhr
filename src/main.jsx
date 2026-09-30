@@ -482,7 +482,10 @@ function App() {
 
     try {
       if (currentEditId) {
-        await editTextMessage(currentEditId, authUser.id, body);
+        const edited = await editTextMessage(currentEditId, authUser.id, body);
+        setActiveMessages(current => current.map(item =>
+          item.id === edited.id ? { ...item, ...edited } : item
+        ));
       } else {
         await sendTextMessage(activeRoom.id, authUser.id, body, currentReply?.id || null);
       }
