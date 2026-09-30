@@ -1407,10 +1407,10 @@ function App() {
                       >
                         {!currentDiscoverPerson.primary_photo_url && <div className="photo-fallback">{initials(currentDiscoverPerson)}</div>}
                         {currentDiscoverPerson.verified_at && <div className="verified-placeholder"><Icon name="badge-check" size={17} /></div>}
-                        <div className="live-photo-meta">
+                        <span className="live-photo-meta">
                           <strong>{personName(currentDiscoverPerson)}</strong>
                           <span><i className={currentDiscoverPerson.online ? "online-dot" : "offline-dot"} /> {currentDiscoverPerson.online ? "Online now" : "Offline"}</span>
-                        </div>
+                        </span>
                       </button>
                       <div className="profile-info">
                         <button type="button" className="discover-name-button" onClick={() => setViewedProfile(currentDiscoverPerson)}>
