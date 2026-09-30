@@ -57,6 +57,7 @@ function App() {
   const [toast, setToast] = useState("");
   const [profile, setProfile] = useState(null);
   const [profilePreview, setProfilePreview] = useState("");
+  const [showWelcome, setShowWelcome] = useState(true);
   const [isMatching, setIsMatching] = useState(false);
   const [matchSeconds, setMatchSeconds] = useState(0);
   const person = discoverPeople[discoverIndex % discoverPeople.length];
@@ -113,6 +114,11 @@ function App() {
     const timer = window.setTimeout(() => setToast(""), 2400);
     return () => window.clearTimeout(timer);
   }, [toast]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setShowWelcome(false), 2300);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (!isMatching) return;
@@ -269,7 +275,20 @@ function App() {
   }
 
   return (
-    <div className="app-shell">
+    <>
+      {showWelcome && (
+        <div className="welcome-screen" aria-hidden="true">
+          <div className="welcome-bubble">
+            <span className="welcome-dot dot-a" />
+            <span className="welcome-dot dot-b" />
+            <span className="welcome-dot dot-c" />
+            <div className="welcome-logo">E</div>
+          </div>
+          <div className="welcome-wordmark">ELSEWHR</div>
+          <div className="welcome-tag">GO SOMEWHERE ELSE.</div>
+        </div>
+      )}
+      <div className="app-shell">
       <aside className="sidebar">
         <button className="brand" onClick={() => navigateTo("home")}>
           <span className="brand-mark">E</span>
@@ -308,7 +327,14 @@ function App() {
           <div className="online-pill"><span className="status-dot" /> People are elsewhere right now</div>
           <div className="top-actions">
             <button onClick={() => setShowPlus(true)}><Icon name="sparkles" size={14} /> Get Plus</button>
-            <button className="avatar-button" onClick={() => setShowProfile(true)}>{(profile?.display_name || profile?.username || authEmail || "E").slice(0,1).toUpperCase()}</button>
+            {!authUser ? (
+              <>
+                <button className="top-signin" onClick={() => { setAuthMode("signin"); setShowProfile(true); }}>Sign in</button>
+                <button className="top-signup" onClick={() => { setAuthMode("signup"); setShowProfile(true); }}>Sign up</button>
+              </>
+            ) : (
+              <button className="avatar-button" onClick={() => setShowProfile(true)}>{(profile?.display_name || profile?.username || authEmail || "E").slice(0,1).toUpperCase()}</button>
+            )}
           </div>
         </header>
 
@@ -481,13 +507,13 @@ function App() {
       {showProfile && (
         <div className="modal-backdrop" onMouseDown={() => setShowProfile(false)}>
           <div className="modal profile-modal" onMouseDown={e => e.stopPropagation()}>
-            <div className="modal-top"><span className="eyebrow">CREATE PROFILE</span><button onClick={() => setShowProfile(false)} aria-label="Close"><Icon name="x" size={16} /></button></div>
-            <h2>Show people there's a real person here.</h2>
+            <div className="modal-top"><span className="eyebrow">{authUser ? "PROFILE" : authMode === "signup" ? "JOIN ELSEWHR" : "WELCOME BACK"}</span><button onClick={() => setShowProfile(false)} aria-label="Close"><Icon name="x" size={16} /></button></div>
+            <h2>{authUser ? "Show people there's a real person here." : authMode === "signup" ? "Meet someone you would've never met." : "Good to see you again."}</h2>
             <p className="modal-copy">A real primary photo helps us keep ELSEWHR human and reduces fake, explicit, and spam-heavy profiles.</p>
             {!supabaseConfigured && <div className="verification-callout"><span><Icon name="info" size={18} /></span><div><strong>Prototype mode</strong><p>Connect the Supabase environment to enable real accounts, profile storage and realtime features.</p></div></div>}
             {supabaseConfigured && !authUser && (
               <form onSubmit={handleAuth} className="auth-form">
-                <div className="auth-toggle"><button type="button" className={authMode === "signin" ? "selected" : ""} onClick={() => setAuthMode("signin")}>Sign in</button><button type="button" className={authMode === "signup" ? "selected" : ""} onClick={() => setAuthMode("signup")}>Create account</button></div>
+                <div className="auth-toggle"><button type="button" className={authMode === "signin" ? "selected" : ""} onClick={() => setAuthMode("signin")}>Sign in</button><button type="button" className={authMode === "signup" ? "selected" : ""} onClick={() => setAuthMode("signup")}>Sign up</button></div>
                 <label>Email<input type="email" required value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder="you@example.com" /></label>
                 <label>Password<input type="password" minLength={8} required value={authPassword} onChange={e => setAuthPassword(e.target.value)} placeholder="At least 8 characters" /></label>
                 {accountError && <div className="form-error">{accountError}</div>}
@@ -603,7 +629,8 @@ function App() {
         </div>
       )}
       {toast && <div className="toast">{toast}</div>}
-    </div>
+      </div>
+    </>
   );
 }
 
