@@ -76,6 +76,13 @@ function timeLabel(value) {
 function App() {
   const [page, setPage] = useState("home");
   const [pageMotion, setPageMotion] = useState("forward");
+  const [theme, setTheme] = useState(() => {
+    try {
+      return localStorage.getItem("elsewhr-theme") || "dark";
+    } catch {
+      return "dark";
+    }
+  });
   const [authUser, setAuthUser] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [authMode, setAuthMode] = useState("signin");
@@ -792,6 +799,15 @@ function App() {
   }
 
   useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    try {
+      localStorage.setItem("elsewhr-theme", theme);
+    } catch {
+      // Keep the theme working even when storage is unavailable.
+    }
+  }, [theme]);
+
+  useEffect(() => {
     const timer = window.setTimeout(() => setShowWelcome(false), 2300);
     return () => window.clearTimeout(timer);
   }, []);
@@ -1074,6 +1090,10 @@ function App() {
             <div className="mobile-brand">ELSEWHR</div>
             <div className="online-pill"><span className="status-dot" /> {siteOnlineCount} people online</div>
             <div className="top-actions">
+              <button className="theme-toggle" onClick={() => setTheme(value => value === "dark" ? "light" : "dark")} aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"} title={theme === "dark" ? "Light mode" : "Dark mode"}>
+                <Icon name={theme === "dark" ? "sun-medium" : "moon"} size={15} />
+                <span>{theme === "dark" ? "LIGHT" : "DARK"}</span>
+              </button>
               <button onClick={() => setShowPlus(true)}><Icon name="sparkles" size={14} /> Get Plus</button>
               <button className="avatar-button" onClick={() => setShowProfile(true)}>{initials(profile || { username: isAnonymous ? "guest" : authUser.email })}</button>
             </div>
