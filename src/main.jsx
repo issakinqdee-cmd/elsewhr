@@ -148,6 +148,8 @@ function App() {
 
   const [toast, setToast] = useState("");
   const activeRoomRef = useRef(null);
+  const roomsRef = useRef([]);
+  const activeMessagesRef = useRef([]);
   const notificationsRef = useRef(notifications);
   const notificationTimerRef = useRef(null);
 
@@ -228,6 +230,14 @@ function App() {
   useEffect(() => {
     setDiscoverIndex(0);
   }, [discoverOnlineOnly, discoverVerifiedOnly]);
+
+  useEffect(() => {
+    roomsRef.current = rooms;
+  }, [rooms]);
+
+  useEffect(() => {
+    activeMessagesRef.current = activeMessages;
+  }, [activeMessages]);
 
   const messageRooms = rooms.filter(room => room.kind === "direct");
   const groupRooms = rooms.filter(room => room.kind === "group");
@@ -1012,7 +1022,7 @@ function App() {
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "room_members" }, async (payload) => {
         if (!disposed && payload?.eventType === "INSERT" && payload.new?.user_id !== authUser.id) {
-          const room = rooms.find(item => item.id === payload.new.room_id);
+          const room = roomsRef.current.find(item => item.id === payload.new.room_id);
           const joinedByMe = room?.members?.some(member => member.user_id === authUser.id && !member.left_at);
           if (joinedByMe) {
             addNotification({
@@ -1056,7 +1066,7 @@ function App() {
       .on("postgres_changes", { event: "*", schema: "public", table: "message_reactions" }, async (payload) => {
         if (!disposed && payload?.eventType === "INSERT" && payload.new?.user_id !== authUser.id) {
           const messageId = payload.new.message_id;
-          const known = activeMessages.find(message => message.id === messageId);
+          const known = activeMessagesRef.current.find(message => message.id === messageId);
           let roomId = known?.room_id || null;
           let mine = known?.sender_id === authUser.id;
           if (!known && messageId) {
