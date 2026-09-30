@@ -1002,7 +1002,7 @@ function App() {
         await refreshAll();
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "rooms" }, async (payload) => {
-        if (!disposed && payload?.eventType === "INSERT" && payload.new?.created_by !== authUser.id) {
+        if (!disposed && payload?.eventType === "INSERT" && payload.new?.kind === "group" && payload.new?.created_by !== authUser.id) {
           addNotification({
             type: "room",
             title: "New room opened",
@@ -2140,7 +2140,6 @@ function TogetherGameOverlay({
   message,
   setMessage,
   onChatSend,
-  onChatReact,
   onTttMove,
   onRpsMove,
   onStartReaction,
