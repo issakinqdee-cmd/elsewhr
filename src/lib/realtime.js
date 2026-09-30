@@ -297,17 +297,19 @@ export async function toggleMessageReaction(messageId, userId, reaction) {
 
 export async function connectToUser(currentUserId, targetUserId) {
   const client = await requireSupabase();
-  const { data, error } = await client
-    .from("connections")
-    .upsert({ requester_id: currentUserId, receiver_id: targetUserId, status: "pending" }, { onConflict: "requester_id,receiver_id" })
-    .select("id, requester_id, receiver_id, status, created_at, updated_at")
-    .single();
+  const { data, error } = await client.rpc("connect_or_accept_user", { target_user: targetUserId });
   if (error) throw error;
   return data;
 }
 
 export async function updateConnection(connectionId, status) {
   const client = await requireSupabase();
+  if (status === "accepted") {
+    const { data, error } = await client.rpc("accept_connection", { connection_id: connectionId });
+    if (error) throw error;
+    return data;
+  }
+
   const { data, error } = await client
     .from("connections")
     .update({ status })
