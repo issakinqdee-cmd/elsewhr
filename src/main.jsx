@@ -1349,6 +1349,7 @@ function App() {
                     openMessageActionsId={openMessageActionsId}
                     openReactionId={openReactionId}
                     onConnect={handleConnect}
+                    onViewProfile={person => setViewedProfile(person)}
                     onSend={handleSendMessage}
                     onSendAttachment={handleSendAttachment}
                     attachmentBusy={attachmentBusy}
@@ -1457,13 +1458,15 @@ function App() {
                   <div className="connection-grid">
                     {connections.map(connection => (
                       <article className="connection-card" key={connection.id}>
-                        <div className="conn-avatar real-small-avatar" style={connection.person.primary_photo_url ? { backgroundImage: "url(" + connection.person.primary_photo_url + ")" } : undefined}>
-                          {!connection.person.primary_photo_url && initials(connection.person)}
-                        </div>
-                        <div className="connection-main">
-                          <h3>{personName(connection.person)}</h3>
-                          <span>{connection.person.country || "Location not shared"} · {connection.status}</span>
-                        </div>
+                        <button type="button" className="connection-profile-hit" onClick={() => setViewedProfile(connection.person)} aria-label={"View " + personName(connection.person) + "'s profile"}>
+                          <div className="conn-avatar real-small-avatar" style={connection.person.primary_photo_url ? { backgroundImage: "url(" + connection.person.primary_photo_url + ")" } : undefined}>
+                            {!connection.person.primary_photo_url && initials(connection.person)}
+                          </div>
+                          <div className="connection-main">
+                            <h3>{personName(connection.person)}</h3>
+                            <span>{connection.person.country || "Location not shared"} · {connection.status}</span>
+                          </div>
+                        </button>
                         <div className="connection-actions">
                           {connection.status === "pending" && connection.direction === "incoming" && (
                             <>
@@ -2105,10 +2108,7 @@ function TogetherGamePicker({ games, isPlus, onClose, onSelect, onShowPlus }) {
             <p>Pick a game and send it straight into this conversation.</p>
           </div>
           <div className="together-arena-controls">
-            <button className="together-minimize" onClick={onMinimize} aria-label="Minimize game" title="Minimize">
-              <Icon name="minus" size={15} />
-            </button>
-            <button className="together-close" onClick={onClose} aria-label="End game" title="End game"><Icon name="x" size={15} /></button>
+            <button className="together-close" onClick={onClose} aria-label="Close game picker" title="Close"><Icon name="x" size={15} /></button>
           </div>
         </div>
         <div className="together-game-grid">
@@ -2283,6 +2283,7 @@ function LiveChat({
   openMessageActionsId,
   openReactionId,
   onConnect,
+  onViewProfile,
   onSend,
   onStartReply,
   onStartEdit,
@@ -2615,7 +2616,13 @@ function LiveChat({
   return (
     <section className="chat-page live-chat">
       <div className="chat-header">
-        <div className="person-mini">
+        <button
+          type="button"
+          className={"person-mini chat-profile-trigger " + (activeRoom.kind === "group" ? "is-group" : "")}
+          onClick={() => activeRoom.kind !== "group" && activeOther && onViewProfile?.(activeOther)}
+          disabled={activeRoom.kind === "group"}
+          aria-label={activeRoom.kind === "group" ? "Room information" : "View profile"}
+        >
           <div className="mini-avatar real-small-avatar" style={activeOther?.primary_photo_url ? { backgroundImage: "url(" + activeOther.primary_photo_url + ")" } : undefined}>
             {!activeOther?.primary_photo_url && initials(activeOther || { username: activeRoom.title || activeRoom.kind })}
           </div>
@@ -2623,7 +2630,7 @@ function LiveChat({
             <strong>{activeRoom.kind === "group" ? (activeRoom.title || "Room") : personName(activeOther)}</strong>
             <span><i /> {activeRoom.kind === "group" ? "Public room" : (activeOther?.country || "ELSEWHR member")}</span>
           </div>
-        </div>
+        </button>
         <div className="chat-header-actions">
           <button className="chat-play-button" aria-label="Play together" onClick={() => setShowTogetherGames(true)}>
             <Icon name="gamepad-2" size={14} /> PLAY
@@ -2695,11 +2702,9 @@ function LiveChat({
           rps={rps}
           reactionDuel={reactionDuel}
           activeMessages={activeMessages}
-          authUser={authUser}
           message={message}
           setMessage={setMessage}
           onChatSend={onSend}
-          onChatReact={onReact}
           onTttMove={playTttTogether}
           onRpsMove={playRpsTogether}
           onStartReaction={startReactionDuel}
