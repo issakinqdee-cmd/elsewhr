@@ -1079,6 +1079,7 @@ function App() {
                           <LiveChat
                             activeRoom={activeRoom}
                             activeOther={activeOther}
+                            activeConnection={activeConnection}
                             activeMessages={activeMessages}
                             authUser={authUser}
                             message={message}
@@ -1087,6 +1088,7 @@ function App() {
                             replyToMessage={replyToMessage}
                             openMessageActionsId={openMessageActionsId}
                             openReactionId={openReactionId}
+                            onConnect={handleConnect}
                             onSend={handleSendMessage}
                             onStartReply={startReply}
                             onStartEdit={startEdit}
