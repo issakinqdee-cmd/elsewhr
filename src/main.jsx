@@ -18,6 +18,8 @@ function Icon({ name, size = 18, alt = "" }) {
   return <img className="ui-icon" src={`${ICON_BASE}${name}.png?color=%23c8ff52&width=${size}&height=${size}`} width={size} height={size} alt={alt} aria-hidden={!alt} />;
 }
 
+const PAGE_ORDER = ["home","random","discover","connections","messages","rooms","games"];
+
 const messages = [
   { side: "them", text: "yo", time: "19:41" },
   { side: "me", text: "hey 😂", time: "19:42" },
@@ -27,6 +29,7 @@ const messages = [
 
 function App() {
   const [page, setPage] = useState("home");
+  const [pageMotion, setPageMotion] = useState("forward");
   const [showProfile, setShowProfile] = useState(false);
   const [showPlus, setShowPlus] = useState(false);
   const [showGenesis, setShowGenesis] = useState(false);
@@ -46,6 +49,14 @@ function App() {
   const [paymentBusy, setPaymentBusy] = useState(false);
   const [paymentError, setPaymentError] = useState("");
   const person = discoverPeople[discoverIndex % discoverPeople.length];
+
+  function navigateTo(nextPage) {
+    if (nextPage === page) return;
+    const from = PAGE_ORDER.indexOf(page);
+    const to = PAGE_ORDER.indexOf(nextPage);
+    setPageMotion(to >= from ? "forward" : "back");
+    setPage(nextPage);
+  }
 
   useEffect(() => {
     if (!supabase) return;
@@ -141,7 +152,7 @@ function App() {
   function nextPerson() {
     setDiscoverIndex(v => v + 1);
     setLiked(false);
-    setPage("random");
+    navigateTo("random");
   }
 
   function sendMessage(e) {
@@ -155,7 +166,7 @@ function App() {
   return (
     <div className="app-shell">
       <aside className="sidebar">
-        <button className="brand" onClick={() => setPage("home")}>
+        <button className="brand" onClick={() => navigateTo("home")}>
           <span className="brand-mark">E</span>
           <span>ELSEWHR</span>
         </button>
@@ -163,7 +174,7 @@ function App() {
         <div className="side-section">
           <span className="side-label">EXPLORE</span>
           {nav.map(([key, icon, label]) => (
-            <button key={key} className={`nav-item ${page === key ? "active" : ""}`} onClick={() => setPage(key)}>
+            <button key={key} className={`nav-item ${page === key ? "active" : ""}`} onClick={() => navigateTo(key)}>
               <span className="nav-icon"><Icon name={icon} /></span><span>{label}</span>
             </button>
           ))}
@@ -196,15 +207,15 @@ function App() {
           </div>
         </header>
 
-        <div className="content">
+        <div className={`content page-transition ${pageMotion}`} key={page}>
           {page === "home" && (
             <section className="hero-page">
               <div className="eyebrow">THE INTERNET IS BIGGER THAN YOUR CIRCLE</div>
               <h1>Someone,<br /><span>somewhere,</span><br />is waiting.</h1>
               <p>Meet people outside your usual world. Talk, discover, connect, and decide what happens next.</p>
               <div className="hero-actions">
-                <button className="primary large" onClick={() => setPage("random")}>GO ELSEWHR <Icon name="arrow-up-right" size={16} /></button>
-                <button className="secondary large" onClick={() => setPage("discover")}>DISCOVER PEOPLE</button>
+                <button className="primary large" onClick={() => navigateTo("random")}>GO ELSEWHR <Icon name="arrow-up-right" size={16} /></button>
+                <button className="secondary large" onClick={() => navigateTo("discover")}>DISCOVER PEOPLE</button>
               </div>
               <div className="hero-grid">
                 <div><strong>1 → 1</strong><span>Instant private chat</span></div>
@@ -283,7 +294,7 @@ function App() {
                     <div className="swipe-actions">
                       <button className="round-button pass" onClick={nextPerson} aria-label="Pass"><Icon name="x" size={22} /></button>
                       <button className="round-button super" onClick={() => setShowPlus(true)} aria-label="Super connect"><Icon name="sparkles" size={20} /></button>
-                      <button className="round-button connect" onClick={() => { setLiked(true); setPage("connections"); }} aria-label="Connect"><Icon name="heart" size={21} /></button>
+                      <button className="round-button connect" onClick={() => { setLiked(true); navigateTo("connections"); }} aria-label="Connect"><Icon name="heart" size={21} /></button>
                     </div>
                   </div>
                 </div>
@@ -314,7 +325,7 @@ function App() {
                   <article className="connection-card" key={p.name}>
                     <div className="conn-avatar" style={{background:p.gradient}}>{p.name[0]}</div>
                     <div><h3>{p.name}</h3><span>{p.flag} {p.country}</span></div>
-                    <button onClick={() => setPage("random")}>CHAT</button>
+                    <button onClick={() => navigateTo("random")}>CHAT</button>
                   </article>
                 ))}
               </div>
