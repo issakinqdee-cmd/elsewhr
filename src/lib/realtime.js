@@ -173,30 +173,27 @@ export async function getRoom(roomId) {
 
 export async function listMessages(roomId) {
   const client = await requireSupabase();
-  const [{ data: messages, error: messageError }, { data: reactions, error: reactionError }, { data: hidden, error: hiddenError }] = await Promise.all([
-    client
-      .from("messages")
-      .select("id, room_id, sender_id, body, media_type, created_at, edited_at, deleted_at, reply_to_id")
-      .eq("room_id", roomId)
-      .order("created_at", { ascending: true })
-      .limit(500),
-    client
-      .from("message_reactions")
-      .select("message_id, user_id, reaction, created_at")
-      .in("message_id", (
-        (await client.from("messages").select("id").eq("room_id", roomId).order("created_at", { ascending: true }).limit(500)).data ?? []
-      ).map(row => row.id)),
-    client
-      .from("message_deletions")
-      .select("message_id")
-  ]);
+  const { data: messages, error: messageError } = await client
+    .from("messages")
+    .select("id, room_id, sender_id, body, media_type, created_at, edited_at, deleted_at, reply_to_id")
+    .eq("room_id", roomId)
+    .order("created_at", { ascending: true })
+    .limit(500);
   if (messageError) throw messageError;
-  if (reactionError) throw reactionError;
-  if (hiddenError) throw hiddenError;
 
-  const hiddenIds = new Set((hidden ?? []).map(row => row.message_id));
+  const messageIds = (messages ?? []).map(row => row.id);
+  const [reactionResult, hiddenResult] = await Promise.all([
+    messageIds.length
+      ? client.from("message_reactions").select("message_id, user_id, reaction, created_at").in("message_id", messageIds)
+      : Promise.resolve({ data: [], error: null }),
+    client.from("message_deletions").select("message_id"),
+  ]);
+  if (reactionResult.error) throw reactionResult.error;
+  if (hiddenResult.error) throw hiddenResult.error;
+
+  const hiddenIds = new Set((hiddenResult.data ?? []).map(row => row.message_id));
   const reactionMap = new Map();
-  (reactions ?? []).forEach(row => {
+  (reactionResult.data ?? []).forEach(row => {
     if (!reactionMap.has(row.message_id)) reactionMap.set(row.message_id, []);
     reactionMap.get(row.message_id).push(row);
   });
