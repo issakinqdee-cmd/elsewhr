@@ -148,9 +148,10 @@ function App() {
       const result = authMode === "signin"
         ? await signInWithEmail(authEmail, authPassword)
         : await signUpWithEmail(authEmail, authPassword);
-      setAuthUser(result.user ?? result.session?.user ?? null);
-      if (authMode === "signup" && !result.session) {
-        setAccountError("Check your email to confirm your ELSEWHR account, then sign in.");
+      const signedInUser = result.session?.user ?? null;
+      setAuthUser(signedInUser);
+      if (authMode === "signup" && !signedInUser) {
+        setAccountError("Account created. Check your email to confirm your ELSEWHR account, then sign in.");
       }
     } catch (error) {
       setAccountError(error.message || "Authentication failed.");
