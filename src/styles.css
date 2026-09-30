@@ -290,3 +290,57 @@ button{border:0;cursor:pointer}
 .auth-gate{z-index:999!important;pointer-events:auto!important}
 .auth-gate *{pointer-events:auto}
 .locked-shell{pointer-events:none!important}
+
+
+/* Realtime data surfaces */
+.live-error{margin:12px 28px 0;padding:10px 13px;border:1px solid rgba(255,102,102,.18);background:rgba(255,102,102,.06);color:#ffb4b4;border-radius:11px;font-size:10px;display:flex;align-items:center;gap:7px}
+.empty-state{min-height:340px;border:1px solid rgba(255,255,255,.08);background:#0d0d0d;border-radius:22px;padding:45px 28px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:10px;margin-top:28px}
+.full-state{min-height:calc(100vh - 170px);margin:0;border:0;background:transparent}
+.empty-state h2{font:700 32px/1 "Space Grotesk",sans-serif;margin:8px 0 4px;letter-spacing:-.04em}
+.empty-state p{max-width:520px;color:#82837b;font-size:12px;line-height:1.6;margin:0 0 12px}
+.empty-icon{width:54px;height:54px;border-radius:16px;display:grid;place-items:center;background:rgba(200,255,82,.08);border:1px solid rgba(200,255,82,.15);color:#c8ff52}
+.filter-row{display:flex;gap:8px;flex-wrap:wrap}
+.filter-row label{display:flex;align-items:center;gap:6px;border:1px solid rgba(255,255,255,.08);border-radius:999px;padding:8px 11px;color:#9b9c94;font-size:10px;background:#0f0f0f}
+.filter-row input{accent-color:#c8ff52}
+.real-photo{background-size:cover;background-position:center}
+.photo-fallback{font:800 76px/1 "Space Grotesk",sans-serif;color:#c8ff52}
+.live-photo-meta{position:relative;z-index:2;width:100%;display:flex;align-items:flex-end;justify-content:space-between;gap:10px}
+.live-photo-meta strong{font:700 30px/1 "Space Grotesk",sans-serif}
+.live-photo-meta span{font-size:10px;color:#d6d7cf;display:flex;gap:5px;align-items:center}
+.online-dot,.offline-dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+.online-dot{background:#c8ff52;box-shadow:0 0 12px rgba(200,255,82,.65)}
+.offline-dot{background:#73746d}
+.real-small-avatar{background-size:cover;background-position:center}
+.real-avatar{background-size:cover;background-position:center}
+.connection-main{min-width:0}
+.connection-main h3{margin:0 0 4px;font-size:14px}
+.connection-main span{font-size:10px;color:#77786f}
+.connection-actions{margin-left:auto;display:flex;gap:6px}
+.connection-actions button{background:#c8ff52;color:#10110b;border-radius:999px;padding:7px 10px;font-size:9px;font-weight:800}
+.connection-actions .secondary-mini{background:#171717;color:#c9cac3;border:1px solid rgba(255,255,255,.08)}
+.messages-page{min-height:calc(100vh - 72px);padding:54px 5vw 70px;max-width:1160px;margin:0 auto}
+.message-room-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:30px}
+.message-room-card{width:100%;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;text-align:left;background:#0d0d0d;color:#fff;border:1px solid rgba(255,255,255,.08);padding:15px;border-radius:17px}
+.message-room-card:hover{background:#111;transform:translateY(-2px)}
+.message-room-card>div:nth-child(2){min-width:0;display:grid;gap:5px}
+.message-room-card strong{font-size:13px}
+.message-room-card span{font-size:10px;color:#7d7e77;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.message-room-card small{font-size:9px;color:#66675f}
+.room-create-card{display:grid;grid-template-columns:1.2fr 1fr 1fr auto;gap:9px;align-items:center;border:1px solid rgba(255,255,255,.08);background:#0d0d0d;padding:14px;border-radius:17px;margin-top:28px}
+.room-create-card>div{display:grid;gap:3px}
+.room-create-card strong{font:700 15px/1.2 "Space Grotesk",sans-serif}
+.room-create-card span{font-size:10px;color:#77786f}
+.room-create-card input{background:#131313;border:1px solid rgba(255,255,255,.08);color:#fff;border-radius:10px;padding:11px;outline:0}
+.room-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:16px}
+.room-card{border:1px solid rgba(255,255,255,.08);background:#0d0d0d;border-radius:18px;padding:17px;display:grid;gap:11px}
+.room-card-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.room-card-top>span:last-child{font-size:9px;color:#888980}
+.room-card h3{font:700 22px/1.05 "Space Grotesk",sans-serif;margin:4px 0 0}
+.room-card p{font-size:11px;color:#85867f;line-height:1.55;min-height:34px;margin:0}
+.room-card .secondary{justify-self:start}
+.room-empty-line{text-align:center;color:#686961;font-size:11px;padding:35px 0}
+@media(max-width:900px){
+  .message-room-grid,.room-grid{grid-template-columns:1fr}
+  .room-create-card{grid-template-columns:1fr}
+  .messages-page{padding:36px 20px 70px}
+}
