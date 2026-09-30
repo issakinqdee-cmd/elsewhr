@@ -536,7 +536,7 @@ function App() {
             ["random", "zap", "Random"],
             ["discover", "compass", "Discover"],
             ["messages", "message-circle", "Messages"],
-            ["profile", "user-circle-2", "Profile"]
+            ["profile", "user-circle-2", "My Profile"]
           ].map(([key, icon, label]) => (
             <button key={key} className={page === key ? "active" : ""} onClick={() => key === "profile" ? setShowProfile(true) : goSocial(key)}>
               <Icon name={icon} size={17} />
