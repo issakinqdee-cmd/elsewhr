@@ -318,7 +318,7 @@ function App() {
   return (
     <>
       {showWelcome && (
-        <div className="welcome-screen" aria-hidden="true">
+        <div className="welcome-screen splash-screen" aria-hidden="true">
           <div className="welcome-bubble">
             <span className="welcome-dot dot-a" />
             <span className="welcome-dot dot-b" />
