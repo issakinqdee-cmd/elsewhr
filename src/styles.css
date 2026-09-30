@@ -344,3 +344,53 @@ button{border:0;cursor:pointer}
   .room-create-card{grid-template-columns:1fr}
   .messages-page{padding:36px 20px 70px}
 }
+
+
+/* Message controls */
+.message-row-rich{position:relative;align-items:flex-end}
+.message-bubble-wrap{position:relative;max-width:min(82%,620px)}
+.message-row.me .message-bubble-wrap{display:flex;flex-direction:column;align-items:flex-end}
+.message-row.them .message-bubble-wrap{display:flex;flex-direction:column;align-items:flex-start}
+.message-bubble-wrap .bubble{max-width:100%}
+.message-bubble-wrap .bubble span{white-space:pre-wrap;overflow-wrap:anywhere}
+.message-bubble-wrap .bubble.deleted-bubble{background:#161616;color:#777;border-style:dashed;font-style:italic}
+.message-hover-actions{position:absolute;top:-34px;display:flex;gap:3px;padding:4px;border:1px solid rgba(255,255,255,.08);background:#101010;border-radius:10px;box-shadow:0 12px 30px rgba(0,0,0,.28);opacity:0;transform:translateY(4px);pointer-events:none;transition:.16s ease;z-index:8}
+.message-row.me .message-hover-actions{right:0}
+.message-row.them .message-hover-actions{left:0}
+.message-bubble-wrap:hover .message-hover-actions,.message-hover-actions:focus-within{opacity:1;transform:translateY(0);pointer-events:auto}
+.message-hover-actions button{width:28px;height:26px;background:transparent;color:#999;border-radius:7px;display:grid;place-items:center}
+.message-hover-actions button:hover{background:#1b1b1b;color:#fff}
+.message-reactions{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.reaction-chip{display:inline-flex!important;align-items:center;gap:4px;background:#121212!important;border:1px solid rgba(255,255,255,.09)!important;border-radius:999px!important;padding:4px 7px!important;color:#c4c5bd!important;font-size:11px!important}
+.reaction-chip.mine{background:rgba(200,255,82,.09)!important;border-color:rgba(200,255,82,.22)!important;color:#c8ff52!important}
+.reaction-chip small{display:inline!important;font-size:9px!important;opacity:.8!important;margin:0!important}
+.reaction-picker,.message-action-menu{position:absolute;top:calc(100% + 7px);z-index:15;border:1px solid rgba(255,255,255,.1);background:#111;box-shadow:0 18px 45px rgba(0,0,0,.42);border-radius:13px}
+.reaction-picker{display:flex;gap:4px;padding:7px}
+.reaction-picker.left{left:0}
+.reaction-picker.right{right:0}
+.reaction-picker button{width:32px;height:30px;border-radius:8px;background:transparent;color:#fff;font-size:16px}
+.reaction-picker button:hover{background:#1b1b1b;transform:scale(1.08)}
+.message-action-menu{display:grid;gap:2px;min-width:170px;padding:6px}
+.message-action-menu.left{left:0}
+.message-action-menu.right{right:0}
+.message-action-menu button{display:flex;align-items:center;gap:9px;padding:9px 10px;background:transparent;border:0;color:#c7c8c0;border-radius:8px;font-size:10px;text-align:left;white-space:nowrap}
+.message-action-menu button:hover{background:#1b1b1b;color:#fff}
+.message-action-menu .danger-menu-item{color:#ff9e9e}
+.message-reply-preview{width:min(100%,420px);display:grid;gap:3px;text-align:left;background:#111;border:1px solid rgba(255,255,255,.08);border-left:2px solid rgba(200,255,82,.6);border-radius:10px;padding:8px 10px;margin-bottom:5px;color:#aaa}
+.message-row.me .message-reply-preview{align-self:flex-end}
+.message-reply-preview strong{font-size:9px;color:#c8ff52;letter-spacing:.04em}
+.message-reply-preview span{font-size:10px;color:#8f9089;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.composer-context{width:min(850px,calc(100% - 52px));margin:0 auto 5px;padding:8px 10px;display:flex;justify-content:space-between;gap:12px;align-items:center;border:1px solid rgba(200,255,82,.12);background:rgba(200,255,82,.035);border-radius:12px}
+.composer-context>div{min-width:0;display:grid;gap:3px}
+.composer-context span{font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:#c8ff52}
+.composer-context strong{font-size:10px;color:#9b9c95;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.composer-context>button{width:28px;height:28px;flex:none;background:#151515;color:#8f9088;border-radius:8px;display:grid;place-items:center}
+.composer-context>button:hover{color:#fff;background:#1b1b1b}
+.composer .composer-cancel{width:32px;color:#777}
+.composer .composer-cancel:not(:disabled):hover{color:#fff;background:#191919}
+@media(max-width:620px){
+  .message-hover-actions{opacity:1;transform:none;pointer-events:auto;top:-31px}
+  .message-bubble-wrap{max-width:88%}
+  .message-action-menu{max-width:calc(100vw - 40px)}
+  .composer-context{width:calc(100% - 20px)}
+}
