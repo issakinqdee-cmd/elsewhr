@@ -20,6 +20,30 @@ export async function signUpWithEmail(email, password) {
   return data;
 }
 
+export async function signInAnonymously() {
+  if (!supabase) throw new Error("Supabase is not configured.");
+  const { data, error } = await supabase.auth.signInAnonymously();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteAccount() {
+  if (!supabase) throw new Error("Supabase is not configured.");
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) throw new Error("Your session expired. Sign in again.");
+
+  const response = await fetch("/api/account/delete", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || "Could not delete your account.");
+
+  await supabase.auth.signOut();
+  return true;
+}
+
 export async function signOut() {
   if (!supabase) return;
   const { error } = await supabase.auth.signOut();
