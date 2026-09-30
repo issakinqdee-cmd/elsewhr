@@ -2288,3 +2288,21 @@ body,
   text-underline-offset:4px;
 }
 .chat-profile-trigger:disabled{cursor:default}
+
+.connection-card .connection-profile-hit{
+  margin-left:0;
+  width:auto;
+  flex:1;
+  background:transparent;
+  color:inherit;
+  border:0;
+  padding:0;
+  border-radius:14px;
+  font-size:inherit;
+  font-weight:inherit;
+}
+.connection-card .connection-profile-hit:hover{
+  background:transparent;
+  transform:none;
+}
+.connection-card .connection-profile-hit .connection-main{min-width:0}
