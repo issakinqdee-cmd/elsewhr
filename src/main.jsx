@@ -18,6 +18,10 @@ import {
   listRooms,
   reportUser,
   sendTextMessage,
+  editTextMessage,
+  deleteMessageForMe,
+  deleteMessageForEveryone,
+  toggleMessageReaction,
   touchPresence,
   updateConnection,
 } from "./lib/realtime";
@@ -83,6 +87,10 @@ function App() {
   const [activeRoom, setActiveRoom] = useState(null);
   const [activeMessages, setActiveMessages] = useState([]);
   const [message, setMessage] = useState("");
+  const [editingMessageId, setEditingMessageId] = useState(null);
+  const [replyToMessage, setReplyToMessage] = useState(null);
+  const [openMessageActionsId, setOpenMessageActionsId] = useState(null);
+  const [openReactionId, setOpenReactionId] = useState(null);
   const [dataBusy, setDataBusy] = useState(false);
   const [dataError, setDataError] = useState("");
 
@@ -399,15 +407,96 @@ function App() {
     event.preventDefault();
     if (!authUser || !activeRoom || !message.trim()) return;
     const body = message.trim();
+    const currentReply = replyToMessage;
+    const currentEditId = editingMessageId;
     setMessage("");
+    setReplyToMessage(null);
+    setEditingMessageId(null);
+
     try {
-      await sendTextMessage(activeRoom.id, authUser.id, body);
+      if (currentEditId) {
+        await editTextMessage(currentEditId, authUser.id, body);
+      } else {
+        await sendTextMessage(activeRoom.id, authUser.id, body, currentReply?.id || null);
+      }
+      setOpenMessageActionsId(null);
       await refreshMessages(activeRoom.id);
       await refreshAll();
     } catch (error) {
       setMessage(body);
-      setDataError(error.message || "Message could not be sent.");
+      if (currentReply) setReplyToMessage(currentReply);
+      if (currentEditId) setEditingMessageId(currentEditId);
+      setDataError(error.message || "Message could not be saved.");
     }
+  }
+
+  function startReply(messageToReply) {
+    setReplyToMessage(messageToReply);
+    setEditingMessageId(null);
+    setOpenMessageActionsId(null);
+    setOpenReactionId(null);
+  }
+
+  function startEdit(messageToEdit) {
+    if (messageToEdit.sender_id !== authUser?.id || messageToEdit.deleted_at || !messageToEdit.body) return;
+    setEditingMessageId(messageToEdit.id);
+    setReplyToMessage(null);
+    setMessage(messageToEdit.body);
+    setOpenMessageActionsId(null);
+    setOpenReactionId(null);
+  }
+
+  function cancelMessageEdit() {
+    setEditingMessageId(null);
+    setMessage("");
+  }
+
+  async function handleDeleteForMe(messageToDelete) {
+    if (!authUser) return;
+    try {
+      await deleteMessageForMe(messageToDelete.id, authUser.id);
+      setOpenMessageActionsId(null);
+      await refreshMessages(activeRoom?.id);
+      await refreshAll();
+    } catch (error) {
+      setDataError(error.message || "Message could not be removed for you.");
+    }
+  }
+
+  async function handleDeleteForEveryone(messageToDelete) {
+    if (!authUser || messageToDelete.sender_id !== authUser.id) return;
+    if (!window.confirm("Delete this message for everyone?")) return;
+    try {
+      await deleteMessageForEveryone(messageToDelete.id, authUser.id);
+      setOpenMessageActionsId(null);
+      await refreshMessages(activeRoom?.id);
+      await refreshAll();
+    } catch (error) {
+      setDataError(error.message || "Message could not be deleted for everyone.");
+    }
+  }
+
+  async function handleMessageReaction(messageToReact, reaction) {
+    if (!authUser) return;
+    try {
+      await toggleMessageReaction(messageToReact.id, authUser.id, reaction);
+      setOpenReactionId(null);
+      setOpenMessageActionsId(null);
+      await refreshMessages(activeRoom?.id);
+    } catch (error) {
+      setDataError(error.message || "Reaction could not be changed.");
+    }
+  }
+
+  async function handleCopyMessage(messageToCopy) {
+    if (!messageToCopy.body) return;
+    try {
+      await navigator.clipboard.writeText(messageToCopy.body);
+      setToast("Message copied.");
+    } catch {
+      setDataError("Your browser did not allow clipboard access.");
+    }
+    setOpenMessageActionsId(null);
   }
 
   async function handleConnect(person) {
@@ -605,6 +694,14 @@ function App() {
         await refreshAll();
         if (activeRoomRef.current?.id) await refreshMessages(activeRoomRef.current.id);
       })
+      .on("postgres_changes", { event: "*", schema: "public", table: "message_reactions" }, async () => {
+        if (activeRoomRef.current?.id) await refreshMessages(activeRoomRef.current.id);
+        await refreshAll();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "message_deletions" }, async () => {
+        if (activeRoomRef.current?.id) await refreshMessages(activeRoomRef.current.id);
+        await refreshAll();
+      })
       .subscribe();
 
     const markOffline = () => {
@@ -777,7 +874,26 @@ function App() {
                     authUser={authUser}
                     message={message}
                     setMessage={setMessage}
+                    editingMessageId={editingMessageId}
+                    replyToMessage={replyToMessage}
+                    openMessageActionsId={openMessageActionsId}
+                    openReactionId={openReactionId}
                     onSend={handleSendMessage}
+                    onStartReply={startReply}
+                    onStartEdit={startEdit}
+                    onCancelEdit={cancelMessageEdit}
+                    onDeleteForMe={handleDeleteForMe}
+                    onDeleteForEveryone={handleDeleteForEveryone}
+                    onReact={handleMessageReaction}
+                    onCopy={handleCopyMessage}
+                    onToggleMessageActions={id => {
+                      setOpenMessageActionsId(current => current === id ? null : id);
+                      setOpenReactionId(null);
+                    }}
+                    onToggleReactionPicker={id => {
+                      setOpenReactionId(current => current === id ? null : id);
+                      setOpenMessageActionsId(null);
+                    }}
                     onReport={() => setShowReport(true)}
                     onMenu={() => setShowChatMenu(value => !value)}
                     onLeave={handleLeaveRoom}
@@ -1101,7 +1217,34 @@ function App() {
   );
 }
 
-function LiveChat({ activeRoom, activeOther, activeMessages, authUser, message, setMessage, onSend, onReport, onMenu, onLeave }) {
+function LiveChat({
+  activeRoom,
+  activeOther,
+  activeMessages,
+  authUser,
+  message,
+  setMessage,
+  editingMessageId,
+  replyToMessage,
+  openMessageActionsId,
+  openReactionId,
+  onSend,
+  onStartReply,
+  onStartEdit,
+  onCancelEdit,
+  onDeleteForMe,
+  onDeleteForEveryone,
+  onReact,
+  onCopy,
+  onToggleMessageActions,
+  onToggleReactionPicker,
+  onReport,
+  onMenu,
+  onLeave,
+}) {
+  const reactionChoices = ["❤️", "😂", "🔥", "😍", "😮", "👍"];
+  const byId = new Map(activeMessages.map(item => [item.id, item]));
+
   return (
     <section className="chat-page live-chat">
       <div className="chat-header">
@@ -1129,19 +1272,98 @@ function LiveChat({ activeRoom, activeOther, activeMessages, authUser, message, 
         </div>
 
         <div className="message-stack">
-          {activeMessages.length ? activeMessages.map(item => (
-            <div key={item.id} className={"message-row " + (item.sender_id === authUser.id ? "me" : "them")}>
-              <div className="bubble">{item.media_type ? <span>{item.media_type} message</span> : item.body}<small>{timeLabel(item.created_at)}</small></div>
-            </div>
-          )) : (
+          {activeMessages.length ? activeMessages.map(item => {
+            const isMine = item.sender_id === authUser.id;
+            const reply = item.reply_to_id ? byId.get(item.reply_to_id) : null;
+            const groupedReactions = (item.reactions || []).reduce((map, row) => {
+              if (!map[row.reaction]) map[row.reaction] = { count: 0, mine: false };
+              map[row.reaction].count += 1;
+              if (row.user_id === authUser.id) map[row.reaction].mine = true;
+              return map;
+            }, {});
+
+            return (
+              <div key={item.id} className={"message-row message-row-rich " + (isMine ? "me" : "them")}>
+                <div className="message-bubble-wrap">
+                  {reply && (
+                    <button className="message-reply-preview" type="button" onClick={() => document.getElementById("message-" + reply.id)?.scrollIntoView({ behavior: "smooth", block: "center" })}>
+                      <strong>{reply.sender_id === authUser.id ? "You" : "Reply"}</strong>
+                      <span>{reply.deleted_at ? "Message deleted" : (reply.body || "Attachment")}</span>
+                    </button>
+                  )}
+
+                  <div className={"bubble " + (item.deleted_at ? "deleted-bubble" : "")}>
+                    <span>{item.deleted_at ? "Message deleted" : item.media_type ? item.media_type + " message" : item.body}</span>
+                    <small>{timeLabel(item.created_at)}{item.edited_at && !item.deleted_at ? " · edited" : ""}</small>
+                  </div>
+
+                  {!!Object.keys(groupedReactions).length && (
+                    <div className="message-reactions">
+                      {Object.entries(groupedReactions).map(([reaction, info]) => (
+                        <button key={reaction} className={info.mine ? "reaction-chip mine" : "reaction-chip"} type="button" onClick={() => onReact(item, reaction)}>
+                          <span>{reaction}</span><small>{info.count}</small>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {!item.deleted_at && (
+                    <div className="message-hover-actions">
+                      <button type="button" aria-label="React" onClick={() => onToggleReactionPicker(item.id)}><Icon name="smile-plus" size={14} /></button>
+                      <button type="button" aria-label="Reply" onClick={() => onStartReply(item)}><Icon name="reply" size={14} /></button>
+                      <button type="button" aria-label="More" onClick={() => onToggleMessageActions(item.id)}><Icon name="ellipsis" size={14} /></button>
+                    </div>
+                  )}
+
+                  {openReactionId === item.id && !item.deleted_at && (
+                    <div className={"reaction-picker " + (isMine ? "right" : "left")}>
+                      {reactionChoices.map(reaction => (
+                        <button key={reaction} type="button" onClick={() => onReact(item, reaction)}>{reaction}</button>
+                      ))}
+                    </div>
+                  )}
+
+                  {openMessageActionsId === item.id && (
+                    <div className={"message-action-menu " + (isMine ? "right" : "left")}>
+                      <button type="button" onClick={() => onStartReply(item)}><Icon name="reply" size={13} /> Reply</button>
+                      {!item.deleted_at && <button type="button" onClick={() => onToggleReactionPicker(item.id)}><Icon name="smile-plus" size={13} /> React</button>}
+                      {!!item.body && <button type="button" onClick={() => onCopy(item)}><Icon name="copy" size={13} /> Copy</button>}
+                      {isMine && !item.deleted_at && <button type="button" onClick={() => onStartEdit(item)}><Icon name="pencil" size={13} /> Edit</button>}
+                      <button type="button" onClick={() => onDeleteForMe(item)}><Icon name="trash-2" size={13} /> Delete for me</button>
+                      {isMine && !item.deleted_at && <button type="button" className="danger-menu-item" onClick={() => onDeleteForEveryone(item)}><Icon name="trash" size={13} /> Delete for everyone</button>}
+                      {!isMine && <button type="button" onClick={onReport}><Icon name="flag" size={13} /> Report</button>}
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          }) : (
             <div className="room-empty-line">No messages in this room yet.</div>
           )}
         </div>
       </div>
 
+      {replyToMessage && (
+        <div className="composer-context">
+          <div>
+            <span>{editingMessageId ? "Editing message" : "Replying to"} {replyToMessage.sender_id === authUser.id ? "yourself" : "member"}</span>
+            <strong>{replyToMessage.body || "Attachment"}</strong>
+          </div>
+          <button type="button" onClick={onCancelEdit} aria-label="Clear message context"><Icon name="x" size={14} /></button>
+        </div>
+      )}
+
+      {editingMessageId && !replyToMessage && (
+        <div className="composer-context">
+          <div><span>Editing message</span><strong>Make your change below.</strong></div>
+          <button type="button" onClick={onCancelEdit} aria-label="Cancel edit"><Icon name="x" size={14} /></button>
+        </div>
+      )}
+
       <form className="composer" onSubmit={onSend}>
-        <input value={message} onChange={e => setMessage(e.target.value)} placeholder="Message..." />
-        <button className="send" aria-label="Send" type="submit"><Icon name="send" size={16} /></button>
+        <input value={message} onChange={e => setMessage(e.target.value)} placeholder={editingMessageId ? "Edit message..." : replyToMessage ? "Write your reply..." : "Message..."} autoFocus={Boolean(editingMessageId)} />
+        <button type="button" className="composer-cancel" onClick={() => { if (editingMessageId || replyToMessage) onCancelEdit(); }} disabled={!editingMessageId && !replyToMessage}><Icon name="x" size={15} /></button>
+        <button className="send" aria-label={editingMessageId ? "Save edit" : "Send"} type="submit"><Icon name={editingMessageId ? "check" : "send"} size={16} /></button>
       </form>
 
       <div className="chat-actions">
