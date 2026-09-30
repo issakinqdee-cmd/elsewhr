@@ -1094,7 +1094,7 @@ function App() {
                 <Icon name={theme === "dark" ? "sun-medium" : "moon"} size={15} />
                 <span>{theme === "dark" ? "LIGHT" : "DARK"}</span>
               </button>
-              <button onClick={() => setShowPlus(true)}><Icon name="sparkles" size={14} /> Get Plus</button>
+              <button className="plus-open-button" onClick={() => setShowPlus(true)}><Icon name="sparkles" size={14} /> Get Plus</button>
               <button className="avatar-button" onClick={() => setShowProfile(true)}>{initials(profile || { username: isAnonymous ? "guest" : authUser.email })}</button>
             </div>
           </header>
