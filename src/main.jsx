@@ -231,9 +231,12 @@ function App() {
     setDataBusy(true);
     setDataError("");
     try {
-      const baseRoom = typeof roomOrId === "string"
-        ? rooms.find(room => room.id === roomOrId)
+      let baseRoom = typeof roomOrId === "string"
+        ? rooms.find(room => room.id === roomOrId) || null
         : roomOrId;
+      if (!baseRoom && typeof roomOrId === "string") {
+        baseRoom = await getRoom(roomOrId);
+      }
       if (!baseRoom) throw new Error("That room is no longer available.");
 
       const isMember = baseRoom.members?.some(member => member.user_id === authUser.id && !member.left_at);
@@ -609,8 +612,8 @@ function App() {
     setDataError("");
     try {
       await joinRoom(room.id, authUser.id);
-      await refreshAll();
       await openRoom(room.id);
+      await refreshAll();
       navigateTo("rooms");
       setToast("You're in. Welcome to the room.");
     } catch (error) {
@@ -666,6 +669,11 @@ function App() {
   async function handlePlusCheckout(plan) {
     if (!authUser) {
       setShowProfile(true);
+      return;
+    }
+    if (isAnonymous) {
+      setShowProfile(true);
+      setToast("Create a permanent account before getting ELSEWHR+.");
       return;
     }
     setPaymentBusy(true);
