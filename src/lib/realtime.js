@@ -122,7 +122,8 @@ export async function listRooms(currentUserId) {
 
   const { data: hiddenMessages, error: hiddenError } = await client
     .from("message_deletions")
-    .select("message_id");
+    .select("message_id")
+    .eq("user_id", currentUserId);
   if (hiddenError) throw hiddenError;
   const hiddenIds = new Set((hiddenMessages ?? []).map(row => row.message_id));
 
@@ -171,7 +172,7 @@ export async function getRoom(roomId) {
   return { ...room, members: (members ?? []).map(member => ({ ...member, profile: byId.get(member.user_id) ?? null })) };
 }
 
-export async function listMessages(roomId) {
+export async function listMessages(roomId, currentUserId) {
   const client = await requireSupabase();
   const { data: messages, error: messageError } = await client
     .from("messages")
@@ -186,7 +187,7 @@ export async function listMessages(roomId) {
     messageIds.length
       ? client.from("message_reactions").select("message_id, user_id, reaction, created_at").in("message_id", messageIds)
       : Promise.resolve({ data: [], error: null }),
-    client.from("message_deletions").select("message_id"),
+    client.from("message_deletions").select("message_id").eq("user_id", currentUserId),
   ]);
   if (reactionResult.error) throw reactionResult.error;
   if (hiddenResult.error) throw hiddenResult.error;
