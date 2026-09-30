@@ -672,3 +672,21 @@ body{
   .chat-header-actions button{display:inline-flex!important}
   .chat-header-actions{gap:5px}
 }
+
+
+/* Public room entry surface */
+.room-chat-surface{
+  height:calc(100vh - 72px);
+  position:relative;
+}
+.room-chat-surface > .live-chat{height:100%}
+.room-back-button{
+  display:inline-flex;
+  position:absolute;
+  left:18px;
+  top:14px;
+  z-index:30;
+}
+@media(min-width:901px){
+  .room-back-button{display:inline-flex}
+}
