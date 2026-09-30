@@ -2253,3 +2253,38 @@ body,
   .game-chat-head strong{font-size:12px}
   .game-chat-composer{padding:8px}
 }
+
+/* Clickable user profile surfaces */
+.connection-profile-hit{
+  min-width:0;
+  flex:1;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  border:0;
+  background:transparent;
+  color:inherit;
+  padding:0;
+  text-align:left;
+  cursor:pointer;
+  border-radius:14px;
+}
+.connection-profile-hit:hover .connection-main h3{
+  text-decoration:underline;
+  text-decoration-color:rgba(139,92,246,.45);
+  text-underline-offset:4px;
+}
+.chat-profile-trigger{
+  border:0;
+  background:transparent;
+  color:inherit;
+  padding:0;
+  text-align:left;
+  cursor:pointer;
+}
+.chat-profile-trigger:not(:disabled):hover .person-mini strong{
+  text-decoration:underline;
+  text-decoration-color:rgba(139,92,246,.5);
+  text-underline-offset:4px;
+}
+.chat-profile-trigger:disabled{cursor:default}
