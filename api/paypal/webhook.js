@@ -90,14 +90,23 @@ export default async function handler(req, res) {
 
     const nextStatus = statusMap[event.event_type];
     if (nextStatus) {
-      await supabase
+      const { data: subscriptionRow } = await supabase
         .from("subscriptions")
         .update({
           status: nextStatus,
           current_period_end: resource.billing_info?.next_billing_time ?? null,
           updated_at: new Date().toISOString(),
         })
-        .eq("provider_subscription_id", subscriptionId);
+        .eq("provider_subscription_id", subscriptionId)
+        .select("user_id")
+        .maybeSingle();
+
+      if (subscriptionRow?.user_id) {
+        await supabase
+          .from("profiles")
+          .update({ is_plus: nextStatus === "active", updated_at: new Date().toISOString() })
+          .eq("id", subscriptionRow.user_id);
+      }
     }
 
     return res.status(200).json({ received: true });
