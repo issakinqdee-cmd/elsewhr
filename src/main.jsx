@@ -217,7 +217,7 @@ function App() {
     }
   }
 
-  async function openRoom(roomOrId, shouldJoin = false) {
+  async function openRoom(roomOrId, shouldJoin = false, navigateToMessages = false) {
     if (!authUser) return;
     setDataBusy(true);
     setDataError("");
@@ -237,7 +237,7 @@ function App() {
       const full = await getRoom(baseRoom.id);
       setCurrentRoom(full);
       setActiveMessages(await listMessages(full.id));
-      navigateTo("messages");
+      if (navigateToMessages) navigateTo("messages");
     } catch (error) {
       setDataError(error.message || "Room could not be opened.");
     } finally {
@@ -502,9 +502,16 @@ function App() {
   async function handleConnect(person) {
     if (!authUser || !person?.id) return;
     try {
-      await connectToUser(authUser.id, person.id);
+      const result = await connectToUser(authUser.id, person.id);
       await refreshAll();
-      setToast("Connection request sent.");
+      if (result?.status === "accepted" && result?.room_id) {
+        const full = await getRoom(result.room_id);
+        setCurrentRoom(full);
+        setActiveMessages(await listMessages(full.id));
+        setToast("You are connected. This Random conversation is now saved.");
+      } else {
+        setToast("Connection request sent.");
+      }
     } catch (error) {
       setDataError(error.message || "Connection request failed.");
     }
@@ -512,8 +519,14 @@ function App() {
 
   async function handleConnectionStatus(connectionId, status) {
     try {
-      await updateConnection(connectionId, status);
+      const result = await updateConnection(connectionId, status);
       await refreshAll();
+      if (status === "accepted" && result?.room_id) {
+        const full = await getRoom(result.room_id);
+        setCurrentRoom(full);
+        setActiveMessages(await listMessages(full.id));
+        setToast("Connection accepted. Your Random conversation is saved in Messages.");
+      }
     } catch (error) {
       setDataError(error.message || "Connection could not be updated.");
     }
@@ -528,8 +541,7 @@ function App() {
       setRoomTitle("");
       setRoomDescription("");
       await refreshAll();
-      setToast("Room created.");
-      await openRoom(room);
+      setToast("Room created. Find it in Rooms to open it.");
     } catch (error) {
       setDataError(error.message || "Room could not be created.");
     } finally {
@@ -541,8 +553,7 @@ function App() {
     try {
       await joinRoom(room.id, authUser.id);
       await refreshAll();
-      await openRoom(room.id);
-      setToast("Joined room.");
+      setToast("Joined room. Open it here when you're ready.");
     } catch (error) {
       setDataError(error.message || "Room could not be joined.");
     }
@@ -555,7 +566,7 @@ function App() {
       setCurrentRoom(null);
       setActiveMessages([]);
       await refreshAll();
-      navigateTo("home");
+      if (page !== "messages" && page !== "random") navigateTo("home");
       setToast("You left the room.");
     } catch (error) {
       setDataError(error.message || "Could not leave this room.");
@@ -1007,52 +1018,101 @@ function App() {
 
             {page === "messages" && (
               <section className="messages-page">
-                {!activeRoom ? (
-                  <>
-                    <div className="section-heading">
-                      <div><span className="eyebrow">MESSAGES</span><h2>Your conversations.</h2></div>
-                    </div>
-                    {messageRooms.length ? (
-                      <div className="message-room-grid">
+                <div className="section-heading">
+                  <div>
+                    <span className="eyebrow">MESSAGES</span>
+                    <h2>Your conversations.</h2>
+                  </div>
+                  <span className="messages-count">{messageRooms.length} saved</span>
+                </div>
+
+                {messageRooms.length ? (
+                  <div className={"messages-layout " + (activeRoom ? "has-active-chat" : "")}>
+                    <aside className="conversation-sidebar">
+                      <div className="conversation-sidebar-head">
+                        <span className="eyebrow">PEOPLE YOU TALKED TO</span>
+                        <small>{messageRooms.length}</small>
+                      </div>
+                      <div className="conversation-list">
                         {messageRooms.map(room => {
                           const other = room.members?.find(member => member.user_id !== authUser.id)?.profile;
+                          const selected = activeRoom?.id === room.id;
+                          const last = room.latest_message;
                           return (
-                            <button className="message-room-card" key={room.id} onClick={() => openRoom(room.id)}>
+                            <button className={"conversation-item " + (selected ? "selected" : "")} key={room.id} onClick={() => openRoom(room.id)}>
                               <div className="conn-avatar real-small-avatar" style={other?.primary_photo_url ? { backgroundImage: "url(" + other.primary_photo_url + ")" } : undefined}>
                                 {!other?.primary_photo_url && initials(other || { username: room.kind })}
                               </div>
-                              <div>
+                              <div className="conversation-copy">
                                 <strong>{room.kind === "random" ? personName(other) : room.title || personName(other)}</strong>
-                                <span>{room.latest_message?.body || "No messages yet."}</span>
+                                <span>{last?.body || "No messages yet."}</span>
                               </div>
-                              <small>{timeLabel(room.latest_message?.created_at || room.created_at)}</small>
+                              <small>{timeLabel(last?.created_at || room.created_at)}</small>
                             </button>
                           );
                         })}
                       </div>
-                    ) : (
-                      <div className="empty-state">
-                        <div className="empty-icon"><Icon name="message-circle" size={23} /></div>
-                        <span className="eyebrow">MESSAGES</span>
-                        <h2>No conversations yet.</h2>
-                        <p>Your messages will appear here after you open a real room or connection.</p>
-                        <button className="primary" onClick={() => navigateTo("discover")}>DISCOVER PEOPLE</button>
-                      </div>
-                    )}
-                  </>
+                    </aside>
+
+                    <div className="conversation-stage">
+                      {activeRoom ? (
+                        <>
+                          <button className="conversation-mobile-back" type="button" onClick={() => {
+                            setCurrentRoom(null);
+                            setActiveMessages([]);
+                          }}>
+                            <Icon name="arrow-left" size={14} /> All conversations
+                          </button>
+                          <LiveChat
+                            activeRoom={activeRoom}
+                            activeOther={activeOther}
+                            activeMessages={activeMessages}
+                            authUser={authUser}
+                            message={message}
+                            setMessage={setMessage}
+                            editingMessageId={editingMessageId}
+                            replyToMessage={replyToMessage}
+                            openMessageActionsId={openMessageActionsId}
+                            openReactionId={openReactionId}
+                            onSend={handleSendMessage}
+                            onStartReply={startReply}
+                            onStartEdit={startEdit}
+                            onCancelEdit={cancelMessageEdit}
+                            onDeleteForMe={handleDeleteForMe}
+                            onDeleteForEveryone={handleDeleteForEveryone}
+                            onReact={handleMessageReaction}
+                            onCopy={handleCopyMessage}
+                            onToggleMessageActions={id => {
+                              setOpenMessageActionsId(current => current === id ? null : id);
+                              setOpenReactionId(null);
+                            }}
+                            onToggleReactionPicker={id => {
+                              setOpenReactionId(current => current === id ? null : id);
+                              setOpenMessageActionsId(null);
+                            }}
+                            onReport={() => setShowReport(true)}
+                            onMenu={() => setShowChatMenu(value => !value)}
+                            onLeave={handleLeaveRoom}
+                          />
+                        </>
+                      ) : (
+                        <div className="conversation-placeholder">
+                          <div className="empty-icon"><Icon name="message-square-more" size={22} /></div>
+                          <span className="eyebrow">SELECT A CONVERSATION</span>
+                          <h3>Choose someone.</h3>
+                          <p>Your conversations stay here. Selecting one opens the chat without leaving Messages.</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 ) : (
-                  <LiveChat
-                    activeRoom={activeRoom}
-                    activeOther={activeOther}
-                    activeMessages={activeMessages}
-                    authUser={authUser}
-                    message={message}
-                    setMessage={setMessage}
-                    onSend={handleSendMessage}
-                    onReport={() => setShowReport(true)}
-                    onMenu={() => setShowChatMenu(value => !value)}
-                    onLeave={handleLeaveRoom}
-                  />
+                  <div className="empty-state">
+                    <div className="empty-icon"><Icon name="message-circle" size={23} /></div>
+                    <span className="eyebrow">MESSAGES</span>
+                    <h2>No conversations yet.</h2>
+                    <p>People you talk to will appear here. Random conversations become saved chats when you connect.</p>
+                    <button className="primary" onClick={() => navigateTo("discover")}>DISCOVER PEOPLE</button>
+                  </div>
                 )}
               </section>
             )}
