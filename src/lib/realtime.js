@@ -114,15 +114,23 @@ export async function listRooms(currentUserId) {
 
   const { data: recentMessages, error: messageError } = await client
     .from("messages")
-    .select("id, room_id, sender_id, body, media_type, created_at")
+    .select("id, room_id, sender_id, body, media_type, created_at, edited_at, deleted_at")
     .in("room_id", roomIds)
     .order("created_at", { ascending: false })
     .limit(250);
   if (messageError) throw messageError;
 
+  const { data: hiddenMessages, error: hiddenError } = await client
+    .from("message_deletions")
+    .select("message_id");
+  if (hiddenError) throw hiddenError;
+  const hiddenIds = new Set((hiddenMessages ?? []).map(row => row.message_id));
+
   const latest = new Map();
-  (recentMessages ?? []).forEach(message => {
-    if (!latest.has(message.room_id)) latest.set(message.room_id, message);
+  (recentMessages ?? []).forEach(row => {
+    if (hiddenIds.has(row.id)) return;
+    if (row.deleted_at) return;
+    if (!latest.has(row.room_id)) latest.set(row.room_id, row);
   });
 
   return (rooms ?? []).map(room => ({
@@ -165,25 +173,129 @@ export async function getRoom(roomId) {
 
 export async function listMessages(roomId) {
   const client = await requireSupabase();
-  const { data, error } = await client
-    .from("messages")
-    .select("id, room_id, sender_id, body, media_type, created_at")
-    .eq("room_id", roomId)
-    .order("created_at", { ascending: true })
-    .limit(500);
-  if (error) throw error;
-  return data ?? [];
+  const [{ data: messages, error: messageError }, { data: reactions, error: reactionError }, { data: hidden, error: hiddenError }] = await Promise.all([
+    client
+      .from("messages")
+      .select("id, room_id, sender_id, body, media_type, created_at, edited_at, deleted_at, reply_to_id")
+      .eq("room_id", roomId)
+      .order("created_at", { ascending: true })
+      .limit(500),
+    client
+      .from("message_reactions")
+      .select("message_id, user_id, reaction, created_at")
+      .in("message_id", (
+        (await client.from("messages").select("id").eq("room_id", roomId).order("created_at", { ascending: true }).limit(500)).data ?? []
+      ).map(row => row.id)),
+    client
+      .from("message_deletions")
+      .select("message_id")
+  ]);
+  if (messageError) throw messageError;
+  if (reactionError) throw reactionError;
+  if (hiddenError) throw hiddenError;
+
+  const hiddenIds = new Set((hidden ?? []).map(row => row.message_id));
+  const reactionMap = new Map();
+  (reactions ?? []).forEach(row => {
+    if (!reactionMap.has(row.message_id)) reactionMap.set(row.message_id, []);
+    reactionMap.get(row.message_id).push(row);
+  });
+
+  return (messages ?? [])
+    .filter(message => !hiddenIds.has(message.id))
+    .map(message => ({
+      ...message,
+      reactions: reactionMap.get(message.id) ?? [],
+    }));
 }
 
-export async function sendTextMessage(roomId, senderId, body) {
+export async function sendTextMessage(roomId, senderId, body, replyToId = null) {
   const client = await requireSupabase();
   const { data, error } = await client
     .from("messages")
-    .insert({ room_id: roomId, sender_id: senderId, body: body.trim() })
-    .select("id, room_id, sender_id, body, media_type, created_at")
+    .insert({
+      room_id: roomId,
+      sender_id: senderId,
+      body: body.trim(),
+      reply_to_id: replyToId || null,
+    })
+    .select("id, room_id, sender_id, body, media_type, created_at, edited_at, deleted_at, reply_to_id")
     .single();
   if (error) throw error;
   return data;
+}
+
+export async function editTextMessage(messageId, senderId, body) {
+  const client = await requireSupabase();
+  const nextBody = body.trim();
+  if (!nextBody) throw new Error("Message cannot be empty.");
+  const { data, error } = await client
+    .from("messages")
+    .update({ body: nextBody, edited_at: new Date().toISOString() })
+    .eq("id", messageId)
+    .eq("sender_id", senderId)
+    .is("deleted_at", null)
+    .select("id, room_id, sender_id, body, media_type, created_at, edited_at, deleted_at, reply_to_id")
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteMessageForMe(messageId, userId) {
+  const client = await requireSupabase();
+  const { error } = await client
+    .from("message_deletions")
+    .upsert({ message_id: messageId, user_id: userId }, { onConflict: "message_id,user_id" });
+  if (error) throw error;
+}
+
+export async function deleteMessageForEveryone(messageId, senderId) {
+  const client = await requireSupabase();
+  const { data, error } = await client
+    .from("messages")
+    .update({
+      body: null,
+      media_type: null,
+      media_path: null,
+      edited_at: null,
+      deleted_at: new Date().toISOString(),
+    })
+    .eq("id", messageId)
+    .eq("sender_id", senderId)
+    .is("deleted_at", null)
+    .select("id, room_id, sender_id, body, media_type, created_at, edited_at, deleted_at, reply_to_id")
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function toggleMessageReaction(messageId, userId, reaction) {
+  const client = await requireSupabase();
+  const { data: existing, error: existingError } = await client
+    .from("message_reactions")
+    .select("message_id, user_id, reaction")
+    .eq("message_id", messageId)
+    .eq("user_id", userId)
+    .eq("reaction", reaction)
+    .maybeSingle();
+  if (existingError) throw existingError;
+
+  if (existing) {
+    const { error } = await client
+      .from("message_reactions")
+      .delete()
+      .eq("message_id", messageId)
+      .eq("user_id", userId)
+      .eq("reaction", reaction);
+    if (error) throw error;
+    return false;
+  }
+
+  const { error } = await client
+    .from("message_reactions")
+    .insert({ message_id: messageId, user_id: userId, reaction });
+  if (error) throw error;
+  return true;
 }
 
 export async function connectToUser(currentUserId, targetUserId) {
