@@ -175,3 +175,22 @@ button{border:0;cursor:pointer}
   .chat-header-actions button:nth-child(1),.chat-header-actions button:nth-child(2){display:inline-flex}
   .chat-header-actions button:nth-child(3){display:inline-flex;padding:8px}
 }
+
+
+/* Random matchmaking */
+.next-button:disabled{opacity:.45;cursor:not-allowed;transform:none!important}
+.matching-stage{min-height:calc(100vh - 180px);display:grid;place-items:center;align-content:center;text-align:center;padding:40px 20px;gap:12px}
+.matching-stage h2{font:700 clamp(32px,5vw,58px)/.98 "Space Grotesk",sans-serif;letter-spacing:-.05em;margin:2px 0 4px}
+.matching-stage p{max-width:420px;color:#85867f;font-size:13px;line-height:1.6;margin:0 0 8px}
+.matching-count{font:700 62px/.9 "Space Grotesk",sans-serif;letter-spacing:-.06em;color:#c8ff52;margin:8px 0}
+.matching-count span{font:500 12px "DM Sans",sans-serif;color:#77786f;letter-spacing:.08em;text-transform:uppercase;margin-left:6px}
+.matching-bar{width:min(360px,80vw);height:5px;border-radius:999px;background:#161616;overflow:hidden;border:1px solid rgba(255,255,255,.06)}
+.matching-bar span{display:block;height:100%;background:#c8ff52;border-radius:inherit;transition:width .9s linear}
+.matching-orbit{position:relative;width:82px;height:82px;border-radius:50%;border:1px solid rgba(200,255,82,.18);margin-bottom:8px;display:grid;place-items:center;animation:matchingPulse 1.6s ease-in-out infinite}
+.matching-orbit:before,.matching-orbit:after{content:"";position:absolute;inset:9px;border:1px solid rgba(255,255,255,.07);border-radius:50%}
+.matching-orbit:after{inset:20px;border-color:rgba(200,255,82,.12)}
+.matching-orbit span,.matching-orbit i,.matching-orbit b{position:absolute;width:8px;height:8px;border-radius:50%;background:#c8ff52;box-shadow:0 0 16px rgba(200,255,82,.45);animation:matchingOrbit 2.2s linear infinite}
+.matching-orbit i{animation-delay:-.73s;transform:rotate(120deg) translateX(29px)}
+.matching-orbit b{animation-delay:-1.46s;transform:rotate(240deg) translateX(29px)}
+@keyframes matchingOrbit{from{transform:rotate(0deg) translateX(29px)}to{transform:rotate(360deg) translateX(29px)}}
+@keyframes matchingPulse{50%{transform:scale(1.04);box-shadow:0 0 42px rgba(200,255,82,.06)}}
