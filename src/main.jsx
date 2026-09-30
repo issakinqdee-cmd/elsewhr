@@ -22,6 +22,7 @@ import {
   deleteMessageForMe,
   deleteMessageForEveryone,
   toggleMessageReaction,
+  uploadRoomAttachment,
   touchPresence,
   updateConnection,
 } from "./lib/realtime";
@@ -107,6 +108,16 @@ function App() {
   const [activeRoom, setActiveRoom] = useState(null);
   const [activeMessages, setActiveMessages] = useState([]);
   const [message, setMessage] = useState("");
+  const [attachmentBusy, setAttachmentBusy] = useState(false);
+  const [notificationPanel, setNotificationPanel] = useState(false);
+  const [notifications, setNotifications] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("elsewhr-notifications") || "[]");
+      return Array.isArray(saved) ? saved.slice(0, 40) : [];
+    } catch {
+      return [];
+    }
+  });
   const [editingMessageId, setEditingMessageId] = useState(null);
   const [replyToMessage, setReplyToMessage] = useState(null);
   const [openMessageActionsId, setOpenMessageActionsId] = useState(null);
@@ -143,6 +154,44 @@ function App() {
 
   const [toast, setToast] = useState("");
   const activeRoomRef = useRef(null);
+  const notificationsRef = useRef(notifications);
+  const notificationTimerRef = useRef(null);
+
+  useEffect(() => {
+    notificationsRef.current = notifications;
+    try {
+      localStorage.setItem("elsewhr-notifications", JSON.stringify(notifications.slice(0, 40)));
+    } catch {}
+  }, [notifications]);
+
+  const unreadNotifications = notifications.filter(item => !item.read).length;
+
+  function addNotification({ type = "activity", title, body, roomId = null, icon = "bell", action = null }) {
+    const item = {
+      id: crypto.randomUUID(),
+      type,
+      title: title || "ELSEWHR",
+      body: body || "",
+      roomId,
+      icon,
+      action,
+      created_at: new Date().toISOString(),
+      read: false,
+    };
+    setNotifications(current => [item, ...current.filter(existing => !(existing.type === item.type && existing.roomId === item.roomId && existing.body === item.body))].slice(0, 40));
+    setToast((title ? title + " · " : "") + (body || "New activity"));
+    if (notificationTimerRef.current) window.clearTimeout(notificationTimerRef.current);
+    notificationTimerRef.current = window.setTimeout(() => setToast(""), 3200);
+  }
+
+  function markNotificationsRead() {
+    setNotifications(current => current.map(item => ({ ...item, read: true })));
+  }
+
+  function clearNotifications() {
+    setNotifications([]);
+    setNotificationPanel(false);
+  }
   const authUserRef = useRef(null);
   const isMatchingRef = useRef(false);
   const matchingSinceRef = useRef(null);
@@ -556,7 +605,7 @@ function App() {
 
   async function handleSendMessage(event) {
     event.preventDefault();
-    if (!authUser || !activeRoom || !message.trim()) return;
+    if (!authUser || !activeRoom || (!message.trim() && !attachmentBusy)) return;
     const body = message.trim();
     const currentReply = replyToMessage;
     const currentEditId = editingMessageId;
@@ -581,6 +630,25 @@ function App() {
       if (currentReply) setReplyToMessage(currentReply);
       if (currentEditId) setEditingMessageId(currentEditId);
       setDataError(error.message || "Message could not be saved.");
+    }
+  }
+
+  async function handleSendAttachment(file, caption = "") {
+    if (!authUser || !activeRoom || !file) return;
+    setAttachmentBusy(true);
+    try {
+      await uploadRoomAttachment(activeRoom.id, authUser.id, file, caption, replyToMessage?.id || null);
+      setMessage("");
+      setReplyToMessage(null);
+      setOpenMessageActionsId(null);
+      setOpenReactionId(null);
+      await refreshMessages(activeRoom.id);
+      await refreshAll();
+      setToast(file.type?.startsWith("image/") ? "Picture sent." : "Attachment sent.");
+    } catch (error) {
+      setDataError(error.message || "Attachment could not be sent.");
+    } finally {
+      setAttachmentBusy(false);
     }
   }
 
@@ -879,7 +947,15 @@ function App() {
       .on("postgres_changes", { event: "*", schema: "public", table: "presence" }, async () => {
         await refreshAll();
       })
-      .on("postgres_changes", { event: "*", schema: "public", table: "connections" }, async () => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "connections" }, async (payload) => {
+        if (!disposed && payload?.new?.receiver_id === authUser.id && payload?.new?.status === "pending") {
+          addNotification({
+            type: "connection",
+            title: "New connection request",
+            body: "Someone wants to connect with you.",
+            icon: "heart",
+          });
+        }
         await refreshAll();
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "rooms" }, async () => {
@@ -896,7 +972,20 @@ function App() {
       .on("postgres_changes", { event: "*", schema: "public", table: "room_members" }, async () => {
         await refreshAll();
       })
-      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, async () => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, async (payload) => {
+        const incoming = payload?.eventType === "INSERT" ? payload.new : null;
+        if (!disposed && incoming?.sender_id && incoming.sender_id !== authUser.id) {
+          const sameRoom = activeRoomRef.current?.id === incoming.room_id;
+          if (!sameRoom) {
+            addNotification({
+              type: "message",
+              title: incoming.media_path ? "New attachment" : "New message",
+              body: incoming.media_path ? (incoming.media_type?.startsWith("image/") ? "Someone sent you a picture." : "Someone sent you an attachment.") : (incoming.body || "New message"),
+              roomId: incoming.room_id,
+              icon: incoming.media_path ? "paperclip" : "message-circle",
+            });
+          }
+        }
         await refreshAll();
         if (activeRoomRef.current?.id) await refreshMessages(activeRoomRef.current.id);
       })
@@ -1094,6 +1183,10 @@ function App() {
                 <Icon name={theme === "dark" ? "sun-medium" : "moon"} size={15} />
                 <span>{theme === "dark" ? "LIGHT" : "DARK"}</span>
               </button>
+              <button className={"notification-button " + (notificationPanel ? "active" : "")} onClick={() => { setNotificationPanel(value => !value); markNotificationsRead(); }} aria-label="Notifications" title="Notifications">
+                <Icon name={unreadNotifications ? "bell-ring" : "bell"} size={16} />
+                <span>{unreadNotifications > 99 ? "99+" : unreadNotifications}</span>
+              </button>
               <button className="plus-open-button" onClick={() => setShowPlus(true)}><Icon name="sparkles" size={14} /> Get Plus</button>
               <button className="avatar-button" onClick={() => setShowProfile(true)}>{initials(profile || { username: isAnonymous ? "guest" : authUser.email })}</button>
             </div>
@@ -1103,6 +1196,18 @@ function App() {
             <div className="live-error">
               <Icon name="circle-alert" size={14} /> {dataError}
             </div>
+          )}
+          {notificationPanel && (
+            <NotificationPanel
+              notifications={notifications}
+              onClose={() => setNotificationPanel(false)}
+              onClear={clearNotifications}
+              onOpenRoom={async roomId => {
+                setNotificationPanel(false);
+                await openRoom(roomId);
+                navigateTo(roomId && rooms.some(room => room.id === roomId && room.kind === "group") ? "rooms" : "messages");
+              }}
+            />
           )}
 
           <div className={"content page-transition " + pageMotion} key={page}>
@@ -1150,6 +1255,9 @@ function App() {
                     openReactionId={openReactionId}
                     onConnect={handleConnect}
                     onSend={handleSendMessage}
+                    onSendAttachment={handleSendAttachment}
+                    attachmentBusy={attachmentBusy}
+                    onNotify={addNotification}
                     onStartReply={startReply}
                     onStartEdit={startEdit}
                     onCancelEdit={cancelMessageEdit}
@@ -1423,6 +1531,9 @@ function App() {
                     openReactionId={openReactionId}
                     onConnect={handleConnect}
                     onSend={handleSendMessage}
+                    onSendAttachment={handleSendAttachment}
+                    attachmentBusy={attachmentBusy}
+                    onNotify={addNotification}
                     onStartReply={startReply}
                     onStartEdit={startEdit}
                     onCancelEdit={cancelMessageEdit}
@@ -1664,6 +1775,42 @@ const GAME_CATALOG = [
   { id:"darts", title:"Darts", desc:"Hit the target, chase the score.", icon:"target", premium:true },
   { id:"higher", title:"Higher or Lower", desc:"Call the next card.", icon:"arrow-up-down", premium:true },
 ];
+
+function NotificationPanel({ notifications, onClose, onClear, onOpenRoom }) {
+  return (
+    <div className="notification-popover">
+      <div className="notification-head">
+        <div>
+          <span className="eyebrow">ELSEWHR</span>
+          <strong>Notifications</strong>
+        </div>
+        <div className="notification-head-actions">
+          {notifications.length > 0 && <button onClick={onClear}>CLEAR</button>}
+          <button onClick={onClose} aria-label="Close"><Icon name="x" size={14} /></button>
+        </div>
+      </div>
+      <div className="notification-list">
+        {notifications.length ? notifications.map(item => (
+          <button key={item.id} className={"notification-item " + (item.read ? "" : "unread")} onClick={() => item.roomId ? onOpenRoom(item.roomId) : onClose()}>
+            <span className="notification-icon"><Icon name={item.icon || "bell"} size={15} /></span>
+            <span className="notification-copy">
+              <strong>{item.title}</strong>
+              <small>{item.body}</small>
+              <em>{timeLabel(item.created_at)}</em>
+            </span>
+            {!item.read && <i />}
+          </button>
+        )) : (
+          <div className="notification-empty">
+            <div className="notification-empty-icon"><Icon name="bell-off" size={18} /></div>
+            <strong>You're all caught up.</strong>
+            <span>Messages, room activity and game invites will appear here.</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function GamesPage({ isPlus, game, setGame, rpsChoice, rpsResult, onRps, reactionScore, reactionActive, onStartReaction, onHitReaction, onOpenGame, onShowPlus }) {
   return (
