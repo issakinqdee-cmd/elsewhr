@@ -1301,8 +1301,6 @@ function App() {
                 </section>
               )
             )}
-              </section>
-            )}
           </div>
         </main>
 
