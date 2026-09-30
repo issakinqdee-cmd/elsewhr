@@ -110,14 +110,7 @@ function App() {
   const [message, setMessage] = useState("");
   const [attachmentBusy, setAttachmentBusy] = useState(false);
   const [notificationPanel, setNotificationPanel] = useState(false);
-  const [notifications, setNotifications] = useState(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem("elsewhr-notifications") || "[]");
-      return Array.isArray(saved) ? saved.slice(0, 40) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [notifications, setNotifications] = useState([]);
   const [editingMessageId, setEditingMessageId] = useState(null);
   const [replyToMessage, setReplyToMessage] = useState(null);
   const [openMessageActionsId, setOpenMessageActionsId] = useState(null);
@@ -157,18 +150,35 @@ function App() {
   const notificationsRef = useRef(notifications);
   const notificationTimerRef = useRef(null);
 
+  const notificationStorageKey = authUser?.id ? "elsewhr-notifications-" + authUser.id : null;
+
+  useEffect(() => {
+    if (!notificationStorageKey) {
+      setNotifications([]);
+      return;
+    }
+    try {
+      const saved = JSON.parse(localStorage.getItem(notificationStorageKey) || "[]");
+      setNotifications(Array.isArray(saved) ? saved.slice(0, 40) : []);
+    } catch {
+      setNotifications([]);
+    }
+  }, [notificationStorageKey]);
+
   useEffect(() => {
     notificationsRef.current = notifications;
+    if (!notificationStorageKey) return;
     try {
-      localStorage.setItem("elsewhr-notifications", JSON.stringify(notifications.slice(0, 40)));
+      localStorage.setItem(notificationStorageKey, JSON.stringify(notifications.slice(0, 40)));
     } catch {}
-  }, [notifications]);
+  }, [notifications, notificationStorageKey]);
 
   const unreadNotifications = notifications.filter(item => !item.read).length;
 
-  function addNotification({ type = "activity", title, body, roomId = null, icon = "bell", action = null }) {
+  function addNotification({ type = "activity", title, body, roomId = null, icon = "bell", action = null, sourceId = null }) {
     const item = {
       id: crypto.randomUUID(),
+      sourceId,
       type,
       title: title || "ELSEWHR",
       body: body || "",
@@ -178,7 +188,11 @@ function App() {
       created_at: new Date().toISOString(),
       read: false,
     };
-    setNotifications(current => [item, ...current.filter(existing => !(existing.type === item.type && existing.roomId === item.roomId && existing.body === item.body))].slice(0, 40));
+    setNotifications(current => {
+      if (sourceId && current.some(existing => existing.sourceId === sourceId)) return current;
+      const same = current.some(existing => existing.type === item.type && existing.roomId === item.roomId && existing.body === item.body);
+      return same ? current : [item, ...current].slice(0, 40);
+    });
     setToast((title ? title + " · " : "") + (body || "New activity"));
     if (notificationTimerRef.current) window.clearTimeout(notificationTimerRef.current);
     notificationTimerRef.current = window.setTimeout(() => setToast(""), 3200);
@@ -948,48 +962,114 @@ function App() {
         await refreshAll();
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "connections" }, async (payload) => {
-        if (!disposed && payload?.new?.receiver_id === authUser.id && payload?.new?.status === "pending") {
-          addNotification({
-            type: "connection",
-            title: "New connection request",
-            body: "Someone wants to connect with you.",
-            icon: "heart",
-          });
+        if (!disposed && payload?.new) {
+          const row = payload.new;
+          const isIncoming = row.receiver_id === authUser.id;
+          const isOutgoing = row.requester_id === authUser.id;
+          if (isIncoming && row.status === "pending") {
+            addNotification({
+              type: "connection",
+              title: "New connection request",
+              body: "Someone wants to connect with you.",
+              icon: "heart",
+              sourceId: "connection-request-" + row.id + "-" + row.updated_at,
+            });
+          } else if ((isIncoming || isOutgoing) && row.status === "accepted") {
+            addNotification({
+              type: "connection",
+              title: "Connection accepted",
+              body: "Your connection is now active.",
+              icon: "heart",
+              sourceId: "connection-accepted-" + row.id + "-" + row.updated_at,
+            });
+          }
         }
         await refreshAll();
       })
-      .on("postgres_changes", { event: "*", schema: "public", table: "rooms" }, async () => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "rooms" }, async (payload) => {
+        if (!disposed && payload?.eventType === "INSERT" && payload.new?.created_by !== authUser.id) {
+          addNotification({
+            type: "room",
+            title: "New room opened",
+            body: payload.new?.title || "A new public room is live.",
+            roomId: payload.new?.id || null,
+            icon: "panels-top-left",
+            sourceId: "room-created-" + payload.new?.id,
+          });
+        }
         await refreshAll();
         if (activeRoomRef.current?.id) {
           try {
             const freshRoom = await getRoom(activeRoomRef.current.id);
             setCurrentRoom(freshRoom);
-          } catch {
-            // Ignore room refresh races while a room is being left.
-          }
+          } catch {}
         }
       })
-      .on("postgres_changes", { event: "*", schema: "public", table: "room_members" }, async () => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "room_members" }, async (payload) => {
+        if (!disposed && payload?.eventType === "INSERT" && payload.new?.user_id !== authUser.id) {
+          const room = rooms.find(item => item.id === payload.new.room_id);
+          const joinedByMe = room?.members?.some(member => member.user_id === authUser.id && !member.left_at);
+          if (joinedByMe) {
+            addNotification({
+              type: "room",
+              title: "Someone joined a room",
+              body: (room?.title || "A room") + " has a new member.",
+              roomId: room.id,
+              icon: "users-round",
+              sourceId: "room-member-" + payload.new.room_id + "-" + payload.new.user_id + "-" + payload.new.joined_at,
+            });
+          }
+        }
         await refreshAll();
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, async (payload) => {
         const incoming = payload?.eventType === "INSERT" ? payload.new : null;
         if (!disposed && incoming?.sender_id && incoming.sender_id !== authUser.id) {
-          const sameRoom = activeRoomRef.current?.id === incoming.room_id;
-          if (!sameRoom) {
-            addNotification({
-              type: "message",
-              title: incoming.media_path ? "New attachment" : "New message",
-              body: incoming.media_path ? (incoming.media_type?.startsWith("image/") ? "Someone sent you a picture." : "Someone sent you an attachment.") : (incoming.body || "New message"),
-              roomId: incoming.room_id,
-              icon: incoming.media_path ? "paperclip" : "message-circle",
-            });
-          }
+          addNotification({
+            type: "message",
+            title: incoming.media_path ? "New attachment" : "New message",
+            body: incoming.media_path
+              ? (incoming.media_type?.startsWith("image/") ? "Someone sent you a picture." : "Someone sent you an attachment.")
+              : (incoming.body || "Someone sent you a message."),
+            roomId: incoming.room_id,
+            icon: incoming.media_path ? "paperclip" : "message-circle",
+            sourceId: "message-" + incoming.id,
+          });
+        } else if (!disposed && payload?.eventType === "UPDATE" && payload.new?.deleted_at && payload.old?.deleted_at !== payload.new.deleted_at) {
+          addNotification({
+            type: "message",
+            title: "Message deleted",
+            body: "A message was removed from a conversation.",
+            roomId: payload.new?.room_id || null,
+            icon: "trash-2",
+            sourceId: "message-delete-" + payload.new?.id,
+          });
         }
         await refreshAll();
         if (activeRoomRef.current?.id) await refreshMessages(activeRoomRef.current.id);
       })
-      .on("postgres_changes", { event: "*", schema: "public", table: "message_reactions" }, async () => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "message_reactions" }, async (payload) => {
+        if (!disposed && payload?.eventType === "INSERT" && payload.new?.user_id !== authUser.id) {
+          const messageId = payload.new.message_id;
+          const known = activeMessages.find(message => message.id === messageId);
+          let roomId = known?.room_id || null;
+          let mine = known?.sender_id === authUser.id;
+          if (!known && messageId) {
+            const { data: target } = await supabase.from("messages").select("room_id, sender_id").eq("id", messageId).maybeSingle();
+            roomId = target?.room_id || null;
+            mine = target?.sender_id === authUser.id;
+          }
+          if (mine) {
+            addNotification({
+              type: "reaction",
+              title: "New reaction",
+              body: payload.new?.reaction ? payload.new.reaction + " on your message." : "Someone reacted to your message.",
+              roomId,
+              icon: "smile-plus",
+              sourceId: "reaction-" + payload.new.message_id + "-" + payload.new.user_id + "-" + payload.new.reaction,
+            });
+          }
+        }
         if (activeRoomRef.current?.id) await refreshMessages(activeRoomRef.current.id);
         await refreshAll();
       })
