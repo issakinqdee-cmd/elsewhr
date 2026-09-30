@@ -2129,72 +2129,137 @@ function TogetherGamePicker({ games, isPlus, onClose, onSelect, onShowPlus }) {
   );
 }
 
-function TogetherGameOverlay({ game, activeOther, authUser, ttt, rps, reactionDuel, onTttMove, onRpsMove, onStartReaction, onHitReaction, onMinimize, onClose }) {
+function TogetherGameOverlay({
+  game,
+  activeOther,
+  authUser,
+  ttt,
+  rps,
+  reactionDuel,
+  activeMessages,
+  message,
+  setMessage,
+  onChatSend,
+  onChatReact,
+  onTttMove,
+  onRpsMove,
+  onStartReaction,
+  onHitReaction,
+  onMinimize,
+  onClose,
+}) {
   const mark = game.id === "ttt" ? (ttt.starterId === authUser.id ? "X" : "O") : "";
+  const chatMessages = activeMessages.slice(-40);
+
   return (
     <div className="together-overlay game-layer" onMouseDown={onClose}>
-      <div className="together-arena" onMouseDown={event => event.stopPropagation()}>
-        <div className="together-arena-top">
-          <div className="versus-line">
-            <span className="versus-avatar mine">{initials({ display_name: "Y" })}</span>
-            <span className="versus-pulse" />
-            <span className="versus-title">{game.title}</span>
-            <span className="versus-pulse" />
-            <span className="versus-avatar them">{initials(activeOther || { display_name: "E" })}</span>
+      <div className="together-game-shell" onMouseDown={event => event.stopPropagation()}>
+        <div className="together-arena">
+          <div className="together-arena-top">
+            <div className="versus-line">
+              <span className="versus-avatar mine">{initials({ display_name: "Y" })}</span>
+              <span className="versus-pulse" />
+              <span className="versus-title">{game.title}</span>
+              <span className="versus-pulse" />
+              <span className="versus-avatar them">{initials(activeOther || { display_name: "E" })}</span>
+            </div>
+            <div className="together-arena-controls">
+              <button className="together-minimize" onClick={onMinimize} aria-label="Minimize game" title="Minimize"><Icon name="minus" size={15} /></button>
+              <button className="together-close" onClick={onClose} aria-label="End game" title="End game"><Icon name="x" size={15} /></button>
+            </div>
           </div>
-          <button className="together-close" onClick={onClose} aria-label="Close"><Icon name="x" size={15} /></button>
+
+          {game.id === "ttt" && (
+            <div className="together-play-stage">
+              <div className="together-status">{ttt.winner === "draw" ? "DRAW" : ttt.winner ? (ttt.winner === authUser.id ? "YOU WIN" : "THEY WIN") : ttt.turn === authUser.id ? "YOUR TURN" : "THEIR TURN"}</div>
+              <div className="duel-board">
+                {ttt.board.map((cell, index) => (
+                  <button key={index} className={"duel-cell " + (cell ? "filled " + cell.toLowerCase() : "")} onClick={() => onTttMove(index)}>{cell}</button>
+                ))}
+              </div>
+              <small>{mark ? "You are " + mark + "." : "Waiting for the game to start."}</small>
+            </div>
+          )}
+
+          {game.id === "rps" && (
+            <div className="together-play-stage">
+              <div className="together-status">{rps.result || (rps.self ? "Waiting for them..." : "Choose your move.")}</div>
+              <div className="rps-kinetic">
+                {["rock","paper","scissors"].map(choice => (
+                  <button key={choice} className={rps.self === choice ? "chosen" : ""} disabled={Boolean(rps.self)} onClick={() => onRpsMove(choice)}>
+                    <span>{choice === "rock" ? "✊" : choice === "paper" ? "✋" : "✌️"}</span>
+                    <small>{choice}</small>
+                  </button>
+                ))}
+              </div>
+              {rps.opponent && <div className="game-result">They played <strong>{rps.opponent}</strong>.</div>}
+            </div>
+          )}
+
+          {game.id === "reaction" && (
+            <div className="together-play-stage">
+              <div className="together-status">{reactionDuel.status === "live" ? "GO!" : reactionDuel.self !== null ? "RESULT LOCKED" : "Ready?"}</div>
+              <button className={"duel-reaction-target " + (reactionDuel.status === "live" ? "live" : "")} onClick={reactionDuel.status === "live" ? onHitReaction : undefined}>
+                {reactionDuel.status === "live" ? "TAP" : reactionDuel.self !== null ? reactionDuel.self + " ms" : "WAIT"}
+              </button>
+              <button className="secondary" onClick={onStartReaction}>{reactionDuel.self !== null || reactionDuel.opponent !== null ? "REMATCH" : "START DUEL"}</button>
+              <div className="reaction-score-row">
+                <span>You <strong>{reactionDuel.self === null ? "—" : reactionDuel.self + " ms"}</strong></span>
+                <span>{activeOther?.display_name || "Them"} <strong>{reactionDuel.opponent === null ? "—" : reactionDuel.opponent + " ms"}</strong></span>
+              </div>
+            </div>
+          )}
+
+          {!["ttt","rps","reaction"].includes(game.id) && (
+            <div className="together-play-stage">
+              <div className="premium-game-preview">
+                <Icon name={game.icon || "gamepad-2"} size={34} />
+                <span className="eyebrow">ELSEWHR+ GAME</span>
+                <h3>{game.title}</h3>
+                <p>This multiplayer game is reserved for the ELSEWHR+ arcade.</p>
+              </div>
+            </div>
+          )}
         </div>
 
-        {game.id === "ttt" && (
-          <div className="together-play-stage">
-            <div className="together-status">{ttt.winner === "draw" ? "DRAW" : ttt.winner ? (ttt.winner === authUser.id ? "YOU WIN" : "THEY WIN") : ttt.turn === authUser.id ? "YOUR TURN" : "THEIR TURN"}</div>
-            <div className="duel-board">
-              {ttt.board.map((cell, index) => (
-                <button key={index} className={"duel-cell " + (cell ? "filled " + cell.toLowerCase() : "")} onClick={() => onTttMove(index)}>{cell}</button>
-              ))}
+        <aside className="game-chat-panel">
+          <div className="game-chat-head">
+            <div>
+              <span className="eyebrow">LIVE CHAT</span>
+              <strong>Talk while you play</strong>
             </div>
-            <small>{mark ? "You are " + mark + "." : "Waiting for the game to start."}</small>
+            <span className="game-chat-live"><i /> LIVE</span>
           </div>
-        )}
 
-        {game.id === "rps" && (
-          <div className="together-play-stage">
-            <div className="together-status">{rps.result || (rps.self ? "Waiting for them..." : "Choose your move.")}</div>
-            <div className="rps-kinetic">
-              {["rock","paper","scissors"].map(choice => (
-                <button key={choice} className={rps.self === choice ? "chosen" : ""} disabled={Boolean(rps.self)} onClick={() => onRpsMove(choice)}>
-                  <span>{choice === "rock" ? "✊" : choice === "paper" ? "✋" : "✌️"}</span>
-                  <small>{choice}</small>
-                </button>
-              ))}
-            </div>
-            {rps.opponent && <div className="game-result">They played <strong>{rps.opponent}</strong>.</div>}
+          <div className="game-chat-messages">
+            {chatMessages.length ? chatMessages.map(item => {
+              const mine = item.sender_id === authUser.id;
+              return (
+                <div key={item.id} className={"game-chat-message " + (mine ? "mine" : "theirs")}>
+                  <span>{item.body || (item.media_type ? "📎 Attachment" : "Message")}</span>
+                  <small>{mine ? "You" : (activeOther?.display_name || "Them")} · {timeLabel(item.created_at)}</small>
+                </div>
+              );
+            }) : (
+              <div className="game-chat-empty">
+                <Icon name="messages-square" size={20} />
+                <span>Say something while you play.</span>
+              </div>
+            )}
           </div>
-        )}
 
-        {game.id === "reaction" && (
-          <div className="together-play-stage">
-            <div className="together-status">{reactionDuel.status === "live" ? "GO!" : reactionDuel.self !== null ? "RESULT LOCKED" : "Ready?"}</div>
-            <button className={"duel-reaction-target " + (reactionDuel.status === "live" ? "live" : "")} onClick={reactionDuel.status === "live" ? onHitReaction : undefined}>
-              {reactionDuel.status === "live" ? "TAP" : reactionDuel.self !== null ? reactionDuel.self + " ms" : "WAIT"}
+          <form className="game-chat-composer" onSubmit={onChatSend}>
+            <input
+              value={message}
+              onChange={event => setMessage(event.target.value)}
+              placeholder="Say something..."
+              maxLength={1000}
+            />
+            <button type="submit" aria-label="Send chat message" disabled={!message.trim()}>
+              <Icon name="send" size={14} />
             </button>
-            <button className="secondary" onClick={onStartReaction}>{reactionDuel.self !== null || reactionDuel.opponent !== null ? "REMATCH" : "START DUEL"}</button>
-            <div className="reaction-score-row">
-              <span>You <strong>{reactionDuel.self === null ? "—" : reactionDuel.self + " ms"}</strong></span>
-              <span>{activeOther?.display_name || "Them"} <strong>{reactionDuel.opponent === null ? "—" : reactionDuel.opponent + " ms"}</strong></span>
-            </div>
-          </div>
-        )}
-        {!["ttt","rps","reaction"].includes(game.id) && (
-          <div className="together-play-stage">
-            <div className="premium-game-preview">
-              <Icon name={game.icon || "gamepad-2"} size={34} />
-              <span className="eyebrow">ELSEWHR+ GAME</span>
-              <h3>{game.title}</h3>
-              <p>This multiplayer game is reserved for the ELSEWHR+ arcade.</p>
-            </div>
-          </div>
-        )}
+          </form>
+        </aside>
       </div>
     </div>
   );
@@ -2629,6 +2694,12 @@ function LiveChat({
           ttt={ttt}
           rps={rps}
           reactionDuel={reactionDuel}
+          activeMessages={activeMessages}
+          authUser={authUser}
+          message={message}
+          setMessage={setMessage}
+          onChatSend={onSend}
+          onChatReact={onReact}
           onTttMove={playTttTogether}
           onRpsMove={playRpsTogether}
           onStartReaction={startReactionDuel}
