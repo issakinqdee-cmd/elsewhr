@@ -2324,6 +2324,7 @@ function LiveChat({
   const [rps, setRps] = useState({ self: null, opponent: null, opponentName: "", result: "" });
   const [reactionDuel, setReactionDuel] = useState({ status: "idle", start: 0, self: null, opponent: null, opponentName: "" });
   const [togetherOpponentId, setTogetherOpponentId] = useState(null);
+  const [togetherReady, setTogetherReady] = useState(false);
 
   const togetherGames = [
     { id:"ttt", title:"Tic Tac Toe", desc:"Take the square. Own the row.", icon:"grid-3x3", premium:false },
@@ -2345,10 +2346,19 @@ function LiveChat({
   ];
 
   function sendTogether(payload) {
+    const participants = payload.participants || (
+      togetherReady && togetherOpponentId
+        ? [authUser.id, togetherOpponentId]
+        : null
+    );
     gameChannelRef.current?.send({
       type: "broadcast",
       event: "together_game",
-      payload: { ...payload, from: authUser.id },
+      payload: {
+        ...payload,
+        ...(participants ? { participants: [...new Set(participants)] } : {}),
+        from: authUser.id,
+      },
     }).catch(() => {});
   }
 
@@ -2374,6 +2384,7 @@ function LiveChat({
     setTogetherGame(gameItem);
     setTogetherMinimized(false);
     setIncomingInvite(null);
+    setTogetherReady(false);
     setTogetherOpponentId(activeRoom.kind === "group" ? null : (activeOther?.id || null));
     if (invite) return;
 
@@ -2421,6 +2432,7 @@ function LiveChat({
     setTogetherGame(item);
     setTogetherMinimized(false);
     setIncomingInvite(null);
+    setTogetherReady(true);
     setTogetherOpponentId(incomingInvite.from);
     resetTogetherState(item.id, incomingInvite.from);
     const reactionDelay = 1900;
@@ -2449,7 +2461,7 @@ function LiveChat({
   }
 
   function declineTogetherInvite() {
-    sendTogether({ kind: "decline", gameId: incomingInvite?.gameId });
+    sendTogether({ kind: "decline", gameId: incomingInvite?.gameId, to: incomingInvite?.from });
     setIncomingInvite(null);
   }
 
@@ -2461,13 +2473,14 @@ function LiveChat({
     setShowTogetherGames(false);
     setIncomingInvite(null);
     setTogetherOpponentId(null);
+    setTogetherReady(false);
     setTtt({ board: Array(9).fill(""), turn: null, starterId: null, winner: null });
     setRps({ self: null, opponent: null, opponentName: "", result: "" });
     setReactionDuel({ status: "idle", start: 0, self: null, opponent: null, opponentName: "" });
   }
 
   function playTttTogether(index) {
-    if (!togetherGame || togetherGame.id !== "ttt" || ttt.winner || ttt.turn !== authUser.id || ttt.board[index]) return;
+    if (!togetherGame || !togetherReady || !togetherOpponentId || togetherGame.id !== "ttt" || ttt.winner || ttt.turn !== authUser.id || ttt.board[index]) return;
     const mark = ttt.starterId === authUser.id ? "X" : "O";
     const next = [...ttt.board];
     next[index] = mark;
@@ -2481,14 +2494,14 @@ function LiveChat({
   }
 
   function playRpsTogether(choice) {
-    if (!togetherGame || togetherGame.id !== "rps" || rps.self) return;
+    if (!togetherGame || !togetherReady || !togetherOpponentId || togetherGame.id !== "rps" || rps.self) return;
     const next = { ...rps, self: choice };
     setRps(next);
     sendTogether({ kind: "rps_move", choice });
   }
 
   function startReactionDuel() {
-    if (!togetherGame || togetherGame.id !== "reaction") return;
+    if (!togetherGame || !togetherReady || !togetherOpponentId || togetherGame.id !== "reaction") return;
     const startDelay = 1900;
     resetTogetherState("reaction");
     sendTogether({
@@ -2518,6 +2531,10 @@ function LiveChat({
       .on("broadcast", { event: "together_game" }, ({ payload }) => {
         if (!payload || payload.from === authUser.id) return;
 
+        if (Array.isArray(payload.participants) && payload.participants.length && !payload.participants.includes(authUser.id)) {
+          return;
+        }
+
         if (payload.kind === "invite") {
           const item = togetherGames.find(candidate => candidate.id === payload.gameId);
           if (item) {
@@ -2534,8 +2551,12 @@ function LiveChat({
         }
 
         if (payload.kind === "decline") {
+          if (payload.to && payload.to !== authUser.id) return;
           setTogetherGame(null);
+          setTogetherMinimized(false);
           setIncomingInvite(null);
+          setTogetherOpponentId(null);
+          setTogetherReady(false);
           return;
         }
 
@@ -2549,6 +2570,7 @@ function LiveChat({
           setTogetherGame(item);
           setTogetherMinimized(false);
           setIncomingInvite(null);
+          setTogetherReady(true);
           resetTogetherState(item.id, payload.starterId || payload.from);
           if (item.id === "reaction") {
             const delay = Number(payload.delay) || 1900;
@@ -2598,6 +2620,7 @@ function LiveChat({
           setTogetherMinimized(false);
           setIncomingInvite(null);
           setTogetherOpponentId(null);
+          setTogetherReady(false);
           if (reactionTimerRef.current) window.clearTimeout(reactionTimerRef.current);
         }
       })
