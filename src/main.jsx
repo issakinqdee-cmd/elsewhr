@@ -85,7 +85,7 @@ function App() {
       if (profileFile) photo = await uploadAvatar(authUser.id, profileFile);
       await saveProfile({
         id: authUser.id,
-        username: authEmail.split("@")[0].replace(/[^a-zA-Z0-9_]/g, "").slice(0, 24) || "elsewhr_user",
+        username: (document.getElementById("profile-username")?.value || authEmail.split("@")[0]).replace(/[^a-zA-Z0-9_]/g, "").slice(0, 24) || `elsewhr_${authUser.id.slice(0, 8)}`,
         display_name: document.getElementById("profile-display-name")?.value || null,
         age: Number(document.getElementById("profile-age")?.value || 18),
         country: document.getElementById("profile-country")?.value || null,
@@ -113,7 +113,11 @@ function App() {
     setPaymentBusy(true);
     setPaymentError("");
     try {
-      const approvalUrl = await startPaypalSubscription(plan, authUser.access_token);
+      if (!supabase) throw new Error("Supabase is not configured.");
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error("Your session expired. Sign in again.");
+      const approvalUrl = await startPaypalSubscription(plan, token);
       window.location.href = approvalUrl;
     } catch (error) {
       setPaymentError(error.message || "PayPal checkout could not start.");
@@ -354,6 +358,7 @@ function App() {
                   <label className="upload-button">Choose<input type="file" accept="image/png,image/jpeg,image/webp" onChange={e => setProfileFile(e.target.files?.[0] ?? null)} hidden /></label>
                 </div>
                 <div className="profile-form-grid">
+                  <label>Username<input id="profile-username" placeholder="your_username" /></label>
                   <label>Display name<input id="profile-display-name" placeholder="Theo" /></label>
                   <label>Age<input id="profile-age" type="number" min="18" placeholder="18+" /></label>
                   <label>Country<input id="profile-country" placeholder="Botswana" /></label>
