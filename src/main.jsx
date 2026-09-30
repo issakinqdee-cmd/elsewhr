@@ -697,6 +697,14 @@ function App() {
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "rooms" }, async () => {
         await refreshAll();
+        if (activeRoomRef.current?.id) {
+          try {
+            const freshRoom = await getRoom(activeRoomRef.current.id);
+            setCurrentRoom(freshRoom);
+          } catch {
+            // Ignore room refresh races while a room is being left.
+          }
+        }
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "room_members" }, async () => {
         await refreshAll();
