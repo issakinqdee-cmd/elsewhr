@@ -1291,3 +1291,9 @@ body{
 }
 :root[data-theme="light"] .rps-kinetic button small{color:#777887}
 :root[data-theme="light"] .reaction-score-row strong{color:#171826}
+
+.premium-game-preview{text-align:center;display:grid;justify-items:center;gap:9px;padding:18px}
+.premium-game-preview>.ui-icon{color:#d8c6ff}
+.premium-game-preview h3{font:700 27px "Space Grotesk",sans-serif;margin:0;letter-spacing:-.04em}
+.premium-game-preview p{max-width:320px;margin:0;color:#7f808b;font-size:10px;line-height:1.5}
+:root[data-theme="light"] .premium-game-preview h3{color:#171826}
