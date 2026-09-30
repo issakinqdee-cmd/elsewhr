@@ -1,75 +1,138 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 import { supabase, supabaseConfigured } from "./lib/supabase";
-import { deleteAccount, getCurrentUser, getProfile, saveProfile, signInAnonymously, signInWithEmail, signOut, signUpWithEmail, uploadAvatar } from "./lib/account";
+import {
+  blockUser,
+  connectToUser,
+  createGroupRoom,
+  findOrCreateDirectRoom,
+  getRoom,
+  joinRandomQueue,
+  joinRoom,
+  leaveRandomQueue,
+  leaveRoom,
+  listConnections,
+  listDiscoverProfiles,
+  listMessages,
+  listRooms,
+  reportUser,
+  sendTextMessage,
+  touchPresence,
+  updateConnection,
+} from "./lib/realtime";
+import {
+  deleteAccount,
+  getCurrentUser,
+  getProfile,
+  saveProfile,
+  signInAnonymously,
+  signInWithEmail,
+  signOut,
+  signUpWithEmail,
+  uploadAvatar,
+} from "./lib/account";
 import { startPaypalSubscription } from "./lib/paypal";
 
-const discoverPeople = [
-  { name: "Maya", age: 24, verified: false, country: "South Africa", flag: "🇿🇦", vibe: "Music", tags: ["Music", "Movies", "Late Night"], bio: "Good conversations > small talk.", gradient: "linear-gradient(145deg,#f6c9b8,#6e4658)" },
-  { name: "Alex", age: 22, verified: false, country: "USA", flag: "🇺🇸", vibe: "Gaming", tags: ["Gaming", "Tech", "Anime"], bio: "Probably awake when I shouldn't be.", gradient: "linear-gradient(145deg,#a9bfff,#433d72)" },
-  { name: "Amara", age: 25, verified: false, country: "Nigeria", flag: "🇳🇬", vibe: "Deep", tags: ["Music", "Books", "Deep Talk"], bio: "Ask me something you actually care about.", gradient: "linear-gradient(145deg,#d0b1ff,#4d384e)" },
-  { name: "Kabelo", age: 23, verified: false, country: "Botswana", flag: "🇧🇼", vibe: "Chill", tags: ["Basketball", "Music", "Memes"], bio: "Here for the random conversations.", gradient: "linear-gradient(145deg,#9ad6bd,#2d4c45)" }
-];
-
-
 const ICON_BASE = "https://api.iconify.design/lucide:";
+
 function Icon({ name, size = 18, alt = "" }) {
-  const png = `${ICON_BASE}${name}.png?color=%23b7b9b1&width=${size}&height=${size}`;
-  const svg = `${ICON_BASE}${name}.svg?color=%23b7b9b1&width=${size}&height=${size}`;
+  const png = ICON_BASE + name + ".png?color=%23b7b9b1&width=" + size + "&height=" + size;
+  const svg = ICON_BASE + name + ".svg?color=%23b7b9b1&width=" + size + "&height=" + size;
   return <img className="ui-icon" src={png} onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = svg; }} width={size} height={size} alt={alt} aria-hidden={!alt} />;
 }
 
-const PAGE_ORDER = ["home","random","discover","connections","messages","rooms","games"];
+const PAGE_ORDER = ["home", "random", "discover", "connections", "messages", "rooms"];
 
-const messages = [
-  { side: "them", text: "yo", time: "19:41" },
-  { side: "me", text: "hey 😂", time: "19:42" },
-  { side: "them", text: "where are you from?", time: "19:42" },
-  { side: "me", text: "Botswana 🇧🇼", time: "19:43" }
-];
+function initials(person) {
+  const label = person?.display_name || person?.username || "E";
+  return label.slice(0, 1).toUpperCase();
+}
+
+function personName(person) {
+  return person?.display_name || person?.username || "ELSEWHR member";
+}
+
+function timeLabel(value) {
+  if (!value) return "";
+  return new Date(value).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
 
 function App() {
   const [page, setPage] = useState("home");
   const [pageMotion, setPageMotion] = useState("forward");
-  const [showProfile, setShowProfile] = useState(false);
-  const [showPlus, setShowPlus] = useState(false);
-  const [showGenesis, setShowGenesis] = useState(false);
-  const [showCall, setShowCall] = useState(null);
-  const [discoverIndex, setDiscoverIndex] = useState(0);
-  const [liked, setLiked] = useState(false);
-  const [message, setMessage] = useState("");
-  const [sent, setSent] = useState([]);
   const [authUser, setAuthUser] = useState(null);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [authMode, setAuthMode] = useState("signin");
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
-  const [authMode, setAuthMode] = useState("signin");
   const [authBusy, setAuthBusy] = useState(false);
-  const [authChecked, setAuthChecked] = useState(false);
-  const [deleteBusy, setDeleteBusy] = useState(false);
-  const [profileFile, setProfileFile] = useState(null);
-  const [profileSaving, setProfileSaving] = useState(false);
   const [accountError, setAccountError] = useState("");
+  const [showWelcome, setShowWelcome] = useState(true);
+
+  const [profile, setProfile] = useState(null);
+  const [profileFile, setProfileFile] = useState(null);
+  const [profilePreview, setProfilePreview] = useState("");
+  const [showProfile, setShowProfile] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+
+  const [discoverPeople, setDiscoverPeople] = useState([]);
+  const [connections, setConnections] = useState([]);
+  const [rooms, setRooms] = useState([]);
+  const [activeRoom, setActiveRoom] = useState(null);
+  const [activeMessages, setActiveMessages] = useState([]);
+  const [message, setMessage] = useState("");
+  const [dataBusy, setDataBusy] = useState(false);
+  const [dataError, setDataError] = useState("");
+
+  const [discoverOnlineOnly, setDiscoverOnlineOnly] = useState(false);
+  const [discoverVerifiedOnly, setDiscoverVerifiedOnly] = useState(false);
+  const [discoverIndex, setDiscoverIndex] = useState(0);
+
+  const [isMatching, setIsMatching] = useState(false);
+  const [matchingSince, setMatchingSince] = useState(null);
+
+  const [roomTitle, setRoomTitle] = useState("");
+  const [roomDescription, setRoomDescription] = useState("");
+  const [roomBusy, setRoomBusy] = useState(false);
+
+  const [showPlus, setShowPlus] = useState(false);
+  const [plusPlan, setPlusPlan] = useState("monthly");
   const [paymentBusy, setPaymentBusy] = useState(false);
   const [paymentError, setPaymentError] = useState("");
+
   const [showReport, setShowReport] = useState(false);
-  const [showComposerTool, setShowComposerTool] = useState("");
+  const [reportBusy, setReportBusy] = useState(false);
   const [showChatMenu, setShowChatMenu] = useState(false);
-  const [plusPlan, setPlusPlan] = useState("monthly");
+
   const [toast, setToast] = useState("");
-  const [profile, setProfile] = useState(null);
-  const [profilePreview, setProfilePreview] = useState("");
-  const [showWelcome, setShowWelcome] = useState(true);
-  const [isMatching, setIsMatching] = useState(false);
-  const [matchSeconds, setMatchSeconds] = useState(0);
-  const person = discoverPeople[discoverIndex % discoverPeople.length];
+  const activeRoomRef = useRef(null);
+  const authUserRef = useRef(null);
   const isAnonymous = Boolean(authUser?.is_anonymous);
   const profileReady = Boolean(authUser && (isAnonymous || (profile?.primary_photo_path && profile?.age >= 18 && profile?.username)));
+  const onlineCount = discoverPeople.filter(person => person.online).length;
+  const visiblePeople = useMemo(() => {
+    return discoverPeople.filter(person => {
+      if (discoverOnlineOnly && !person.online) return false;
+      if (discoverVerifiedOnly && !person.verified_at) return false;
+      return true;
+    });
+  }, [discoverPeople, discoverOnlineOnly, discoverVerifiedOnly]);
+
+  const currentDiscoverPerson = visiblePeople.length
+    ? visiblePeople[discoverIndex % visiblePeople.length]
+    : null;
+
+  const messageRooms = rooms.filter(room => room.kind === "direct" || room.kind === "random");
+  const groupRooms = rooms.filter(room => room.kind === "group");
+  const activeOther = activeRoom?.members?.find(member => member.user_id !== authUser?.id)?.profile ?? null;
 
   function goSocial(nextPage) {
-    if (!authUser || !profileReady) {
+    if (!authUser) return;
+    if (!isAnonymous && !profileReady) {
       setShowProfile(true);
-      setToast("Create your profile and add a primary photo first.");
+      setToast("Finish your profile and add a primary photo first.");
       return;
     }
     navigateTo(nextPage);
@@ -83,84 +146,162 @@ function App() {
     setPage(nextPage);
   }
 
-  async function refreshProfile(user = authUser) {
+  function setCurrentRoom(room) {
+    activeRoomRef.current = room;
+    setActiveRoom(room);
+  }
+
+  async function refreshProfile(user) {
     if (!user || !supabase) {
       setProfile(null);
       return null;
     }
-    const nextProfile = await getProfile(user.id).catch(() => null);
-    setProfile(nextProfile);
-    setProfilePreview(nextProfile?.primary_photo_url ?? "");
-    return nextProfile;
+    const next = await getProfile(user.id).catch(() => null);
+    setProfile(next);
+    setProfilePreview(next?.primary_photo_url || "");
+    return next;
   }
 
-  useEffect(() => {
-    if (!supabase) return;
-    getCurrentUser().then(async user => {
-      setAuthUser(user);
-      if (user) await refreshProfile(user);
-    }).catch(() => {
-      setAuthUser(null);
-      setProfile(null);
-    }).finally(() => setAuthChecked(true));
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-      const user = session?.user ?? null;
-      setAuthUser(user);
-      setAuthChecked(true);
-      if (user) refreshProfile(user);
-      else setProfile(null);
-    });
-    return () => data.subscription.unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    if (!toast) return;
-    const timer = window.setTimeout(() => setToast(""), 2400);
-    return () => window.clearTimeout(timer);
-  }, [toast]);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => setShowWelcome(false), 2300);
-    return () => window.clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
-    if (!isMatching) return;
-    setMatchSeconds(5);
-    const timer = window.setInterval(() => {
-      setMatchSeconds(seconds => {
-        if (seconds <= 1) {
-          window.clearInterval(timer);
-          setDiscoverIndex(index => index + 1);
-          setLiked(false);
-          setSent([]);
-          setMessage("");
-          setIsMatching(false);
-          return 0;
-        }
-        return seconds - 1;
-      });
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, [isMatching]);
-
-  async function handleAnonymous() {
-    setAuthBusy(true);
-    setAccountError("");
+  async function refreshAll() {
+    if (!authUser || !supabase) return;
+    setDataError("");
     try {
-      const result = await signInAnonymously();
-      setAuthUser(result.user ?? null);
-      setShowProfile(false);
-      setToast("You're in anonymously.");
+      const [people, nextConnections, nextRooms] = await Promise.all([
+        listDiscoverProfiles(authUser.id),
+        listConnections(authUser.id),
+        listRooms(authUser.id),
+      ]);
+      setDiscoverPeople(people);
+      setConnections(nextConnections);
+      setRooms(nextRooms);
+
+      if (isMatching && matchingSince) {
+        const newMatch = nextRooms.find(room =>
+          room.kind === "random" &&
+          room.created_at &&
+          new Date(room.created_at).getTime() >= matchingSince - 1500
+        );
+        if (newMatch) {
+          const full = await getRoom(newMatch.id);
+          setCurrentRoom(full);
+          setActiveMessages(await listMessages(full.id));
+          setIsMatching(false);
+          setMatchingSince(null);
+          navigateTo("random");
+          setToast("Matched with someone in real time.");
+        }
+      }
     } catch (error) {
-      setAccountError(error.message || "Anonymous access is not enabled yet.");
-    } finally {
-      setAuthBusy(false);
+      setDataError(error.message || "Live data could not be loaded.");
     }
   }
 
-  async function handleAuth(e) {
-    e.preventDefault();
+  async function refreshMessages(roomId = activeRoomRef.current?.id) {
+    if (!roomId) {
+      setActiveMessages([]);
+      return;
+    }
+    try {
+      const next = await listMessages(roomId);
+      setActiveMessages(next);
+    } catch (error) {
+      setDataError(error.message || "Messages could not be loaded.");
+    }
+  }
+
+  async function openRoom(roomOrId, shouldJoin = false) {
+    if (!authUser) return;
+    setDataBusy(true);
+    setDataError("");
+    try {
+      const baseRoom = typeof roomOrId === "string"
+        ? rooms.find(room => room.id === roomOrId)
+        : roomOrId;
+      if (!baseRoom) throw new Error("That room is no longer available.");
+
+      const isMember = baseRoom.members?.some(member => member.user_id === authUser.id && !member.left_at);
+      if (!isMember && shouldJoin) {
+        await joinRoom(baseRoom.id, authUser.id);
+      } else if (!isMember && baseRoom.kind !== "group") {
+        throw new Error("You are not a member of this room.");
+      }
+
+      const full = await getRoom(baseRoom.id);
+      setCurrentRoom(full);
+      setActiveMessages(await listMessages(full.id));
+      navigateTo("messages");
+    } catch (error) {
+      setDataError(error.message || "Room could not be opened.");
+    } finally {
+      setDataBusy(false);
+    }
+  }
+
+  async function openConnection(person) {
+    if (!person?.id) return;
+    setDataBusy(true);
+    try {
+      const roomId = await findOrCreateDirectRoom(person.id);
+      const full = await getRoom(roomId);
+      setCurrentRoom(full);
+      setActiveMessages(await listMessages(roomId));
+      navigateTo("messages");
+    } catch (error) {
+      setDataError(error.message || "Conversation could not be opened.");
+    } finally {
+      setDataBusy(false);
+    }
+  }
+
+  async function startRandomMatch() {
+    if (!authUser || isAnonymous) {
+      setShowProfile(true);
+      setToast("Create a permanent profile to enter live random chat.");
+      return;
+    }
+    if (!profileReady) {
+      setShowProfile(true);
+      setToast("Finish your profile and add a primary photo first.");
+      return;
+    }
+    setDataError("");
+    setIsMatching(true);
+    setMatchingSince(Date.now());
+    activeRoomRef.current = null;
+    setActiveRoom(null);
+    setActiveMessages([]);
+    try {
+      const roomId = await joinRandomQueue();
+      if (roomId) {
+        const full = await getRoom(roomId);
+        setCurrentRoom(full);
+        setActiveMessages(await listMessages(roomId));
+        setIsMatching(false);
+        setMatchingSince(null);
+        navigateTo("random");
+        setToast("Matched with someone in real time.");
+      } else {
+        navigateTo("random");
+      }
+    } catch (error) {
+      setIsMatching(false);
+      setMatchingSince(null);
+      setDataError(error.message || "Random matching is unavailable.");
+    }
+  }
+
+  async function stopRandomMatch() {
+    try {
+      await leaveRandomQueue();
+    } catch {
+      // Keep the UI responsive if the queue is already empty.
+    }
+    setIsMatching(false);
+    setMatchingSince(null);
+  }
+
+  async function handleAuth(event) {
+    event.preventDefault();
     setAuthBusy(true);
     setAccountError("");
     try {
@@ -179,8 +320,22 @@ function App() {
     }
   }
 
-  async function handleProfileSave(e) {
-    e.preventDefault();
+  async function handleAnonymous() {
+    setAuthBusy(true);
+    setAccountError("");
+    try {
+      const result = await signInAnonymously();
+      setAuthUser(result.user ?? null);
+      setShowProfile(false);
+    } catch (error) {
+      setAccountError(error.message || "Anonymous access is not enabled.");
+    } finally {
+      setAuthBusy(false);
+    }
+  }
+
+  async function handleProfileSave(event) {
+    event.preventDefault();
     if (!authUser) return;
     setProfileSaving(true);
     setAccountError("");
@@ -188,26 +343,32 @@ function App() {
       if (!profileFile && !profile?.primary_photo_path) {
         throw new Error("Add a primary profile photo before joining ELSEWHR.");
       }
-      let photo = null;
-      if (profileFile) photo = await uploadAvatar(authUser.id, profileFile);
+      const photo = profileFile ? await uploadAvatar(authUser.id, profileFile) : null;
+      const username = (document.getElementById("profile-username")?.value || "")
+        .replace(/[^a-zA-Z0-9_]/g, "")
+        .slice(0, 24);
+      if (!username) throw new Error("Choose a username.");
+      const age = Number(document.getElementById("profile-age")?.value || 0);
+      if (age < 18) throw new Error("ELSEWHR is 18+.");
       await saveProfile({
         id: authUser.id,
-        username: (document.getElementById("profile-username")?.value || authEmail.split("@")[0]).replace(/[^a-zA-Z0-9_]/g, "").slice(0, 24) || `elsewhr_${authUser.id.slice(0, 8)}`,
+        username,
         display_name: document.getElementById("profile-display-name")?.value || null,
-        age: Number(document.getElementById("profile-age")?.value || 18),
+        age,
         country: document.getElementById("profile-country")?.value || null,
-        languages: ["English"],
-        interests: ["Music"],
+        languages: [document.getElementById("profile-language")?.value || "English"],
+        interests: (document.getElementById("profile-interests")?.value || "")
+          .split(",").map(value => value.trim()).filter(Boolean).slice(0, 12),
         bio: document.getElementById("profile-bio")?.value || null,
-        primary_photo_path: photo?.path ?? profile?.primary_photo_path ?? null,
-        primary_photo_url: photo?.publicUrl ?? profile?.primary_photo_url ?? null,
+        primary_photo_path: photo?.path || profile?.primary_photo_path || null,
+        primary_photo_url: photo?.publicUrl || profile?.primary_photo_url || null,
         discoverable: true,
+        online_visible: true,
       });
-      const saved = await getProfile(authUser.id);
-      setProfile(saved);
-      setProfilePreview(saved?.primary_photo_url ?? "");
+      await refreshProfile(authUser);
+      await refreshAll();
       setShowProfile(false);
-      setToast("Profile saved. You’re ready to go ELSEWHR.");
+      setToast("Profile updated.");
     } catch (error) {
       setAccountError(error.message || "Could not save your profile.");
     } finally {
@@ -216,9 +377,7 @@ function App() {
   }
 
   async function handleDeleteAccount() {
-    const confirmed = window.confirm("Delete your ELSEWHR account permanently? This removes your profile and account data and cannot be undone.");
-    if (!confirmed) return;
-
+    if (!window.confirm("Delete your ELSEWHR account permanently?")) return;
     setDeleteBusy(true);
     setAccountError("");
     try {
@@ -226,8 +385,8 @@ function App() {
       setAuthUser(null);
       setProfile(null);
       setProfilePreview("");
-      setProfileFile(null);
       setShowProfile(false);
+      setCurrentRoom(null);
       setToast("Your account has been deleted.");
     } catch (error) {
       setAccountError(error.message || "Could not delete your account.");
@@ -236,16 +395,119 @@ function App() {
     }
   }
 
-  async function handlePlusCheckout(plan = "monthly") {
+  async function handleSendMessage(event) {
+    event.preventDefault();
+    if (!authUser || !activeRoom || !message.trim()) return;
+    const body = message.trim();
+    setMessage("");
+    try {
+      await sendTextMessage(activeRoom.id, authUser.id, body);
+      await refreshMessages(activeRoom.id);
+      await refreshAll();
+    } catch (error) {
+      setMessage(body);
+      setDataError(error.message || "Message could not be sent.");
+    }
+  }
+
+  async function handleConnect(person) {
+    if (!authUser || !person?.id) return;
+    try {
+      await connectToUser(authUser.id, person.id);
+      await refreshAll();
+      setToast("Connection request sent.");
+    } catch (error) {
+      setDataError(error.message || "Connection request failed.");
+    }
+  }
+
+  async function handleConnectionStatus(connectionId, status) {
+    try {
+      await updateConnection(connectionId, status);
+      await refreshAll();
+    } catch (error) {
+      setDataError(error.message || "Connection could not be updated.");
+    }
+  }
+
+  async function handleCreateRoom(event) {
+    event.preventDefault();
+    if (!authUser || !roomTitle.trim()) return;
+    setRoomBusy(true);
+    try {
+      const room = await createGroupRoom(authUser.id, roomTitle, roomDescription);
+      setRoomTitle("");
+      setRoomDescription("");
+      await refreshAll();
+      setToast("Room created.");
+      await openRoom(room.id);
+    } catch (error) {
+      setDataError(error.message || "Room could not be created.");
+    } finally {
+      setRoomBusy(false);
+    }
+  }
+
+  async function handleJoinRoom(room) {
+    try {
+      await joinRoom(room.id, authUser.id);
+      await refreshAll();
+      await openRoom(room.id);
+      setToast("Joined room.");
+    } catch (error) {
+      setDataError(error.message || "Room could not be joined.");
+    }
+  }
+
+  async function handleLeaveRoom() {
+    if (!activeRoom || !authUser) return;
+    try {
+      await leaveRoom(activeRoom.id, authUser.id);
+      setCurrentRoom(null);
+      setActiveMessages([]);
+      await refreshAll();
+      navigateTo("home");
+      setToast("You left the room.");
+    } catch (error) {
+      setDataError(error.message || "Could not leave this room.");
+    }
+  }
+
+  async function handleReport(reason) {
+    if (!authUser || !activeOther) return;
+    setReportBusy(true);
+    try {
+      await reportUser(authUser.id, activeOther.id, activeRoom?.id, reason);
+      setShowReport(false);
+      setToast("Report submitted.");
+    } catch (error) {
+      setDataError(error.message || "Report could not be submitted.");
+    } finally {
+      setReportBusy(false);
+    }
+  }
+
+  async function handleBlock() {
+    if (!authUser || !activeOther) return;
+    try {
+      await blockUser(authUser.id, activeOther.id);
+      setShowChatMenu(false);
+      await handleLeaveRoom();
+      await refreshAll();
+      setToast("Member blocked.");
+    } catch (error) {
+      setDataError(error.message || "Block could not be applied.");
+    }
+  }
+
+  async function handlePlusCheckout(plan) {
     if (!authUser) {
       setShowProfile(true);
-      setShowPlus(false);
       return;
     }
     setPaymentBusy(true);
     setPaymentError("");
     try {
-      if (!supabase) throw new Error("Supabase is not configured.");
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData.session?.access_token;
       if (!token) throw new Error("Your session expired. Sign in again.");
@@ -258,27 +520,178 @@ function App() {
     }
   }
 
-  const currentMessages = useMemo(() => {
-    const starters = {
-      Maya: [
-        { side: "them", text: "hey 👋", time: "now" },
-        { side: "them", text: "what part of the world are you from?", time: "now" }
-      ],
-      Alex: [
-        { side: "them", text: "yo 👋", time: "now" },
-        { side: "them", text: "what are you into?", time: "now" }
-      ],
-      Amara: [
-        { side: "them", text: "hey.", time: "now" },
-        { side: "them", text: "tell me something interesting.", time: "now" }
-      ],
-      Kabelo: [
-        { side: "them", text: "aye 😂", time: "now" },
-        { side: "them", text: "random chat or deep chat?", time: "now" }
-      ]
+  useEffect(() => {
+    const timer = window.setTimeout(() => setShowWelcome(false), 2300);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!supabase) {
+      setAuthChecked(true);
+      return;
+    }
+
+    let mounted = true;
+    getCurrentUser()
+      .then(async user => {
+        if (!mounted) return;
+        setAuthUser(user);
+        authUserRef.current = user;
+        if (user) await refreshProfile(user);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setAuthUser(null);
+        authUserRef.current = null;
+      })
+      .finally(() => {
+        if (mounted) setAuthChecked(true);
+      });
+
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      const user = session?.user ?? null;
+      setAuthUser(user);
+      authUserRef.current = user;
+      if (user) refreshProfile(user);
+      else setProfile(null);
+    });
+
+    return () => {
+      mounted = false;
+      data.subscription.unsubscribe();
     };
-    return [...(starters[person.name] ?? starters.Maya), ...sent];
-  }, [person.name, sent]);
+  }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(""), 2600);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
+  useEffect(() => {
+    if (!authUser || !supabase) return;
+
+    let disposed = false;
+    const load = async () => {
+      if (!disposed) {
+        await touchPresence(true).catch(() => {});
+        await refreshAll();
+      }
+    };
+    load();
+
+    const heartbeat = window.setInterval(() => {
+      touchPresence(true).catch(() => {});
+    }, 20000);
+
+    const channel = supabase
+      .channel("elsewhr-live-" + authUser.id)
+      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, async () => {
+        await refreshAll();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "presence" }, async () => {
+        await refreshAll();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "connections" }, async () => {
+        await refreshAll();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "rooms" }, async () => {
+        await refreshAll();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "room_members" }, async () => {
+        await refreshAll();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, async () => {
+        await refreshAll();
+        if (activeRoomRef.current?.id) await refreshMessages(activeRoomRef.current.id);
+      })
+      .subscribe();
+
+    const markOffline = () => {
+      touchPresence(false).catch(() => {});
+    };
+    window.addEventListener("beforeunload", markOffline);
+
+    return () => {
+      disposed = true;
+      window.clearInterval(heartbeat);
+      window.removeEventListener("beforeunload", markOffline);
+      supabase.removeChannel(channel);
+      touchPresence(false).catch(() => {});
+    };
+  }, [authUser?.id]);
+
+  useEffect(() => {
+    activeRoomRef.current = activeRoom;
+  }, [activeRoom]);
+
+  useEffect(() => {
+    if (!activeRoom?.id) {
+      setActiveMessages([]);
+      return;
+    }
+    refreshMessages(activeRoom.id);
+  }, [activeRoom?.id]);
+
+  if (showWelcome) {
+    return (
+      <div className="welcome-screen">
+        <div className="welcome-bubble">
+          <span className="welcome-dot dot-a" />
+          <span className="welcome-dot dot-b" />
+          <span className="welcome-dot dot-c" />
+          <div className="welcome-logo">E</div>
+        </div>
+        <div className="welcome-wordmark">ELSEWHR</div>
+        <div className="welcome-tag">GO SOMEWHERE ELSE.</div>
+      </div>
+    );
+  }
+
+  if (!authChecked) {
+    return (
+      <div className="auth-gate">
+        <div className="auth-gate-inner">
+          <div className="auth-gate-logo"><span className="brand-mark">E</span><strong>ELSEWHR</strong></div>
+          <span className="eyebrow">ELSEWHR</span>
+          <h1>Connecting.</h1>
+          <p>Checking your live session.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!authUser) {
+    return (
+      <div className="auth-gate">
+        <div className="auth-gate-inner">
+          <div className="auth-gate-logo"><span className="brand-mark">E</span><strong>ELSEWHR</strong></div>
+          <span className="eyebrow">{authMode === "signup" ? "JOIN ELSEWHR" : "WELCOME BACK"}</span>
+          <h1>{authMode === "signup" ? "Go somewhere else." : "Someone, somewhere, is waiting."}</h1>
+          <p>Sign in, create your account, or enter anonymously.</p>
+          {supabaseConfigured ? (
+            <>
+              <form onSubmit={handleAuth} className="auth-form auth-gate-form">
+                <div className="auth-toggle">
+                  <button type="button" className={authMode === "signin" ? "selected" : ""} onClick={() => { setAuthMode("signin"); setAccountError(""); }}>Sign in</button>
+                  <button type="button" className={authMode === "signup" ? "selected" : ""} onClick={() => { setAuthMode("signup"); setAccountError(""); }}>Sign up</button>
+                </div>
+                <label>Email<input type="email" required value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder="you@example.com" /></label>
+                <label>Password<input type="password" minLength={8} required value={authPassword} onChange={e => setAuthPassword(e.target.value)} placeholder="At least 8 characters" /></label>
+                {accountError && <div className="form-error">{accountError}</div>}
+                <button className="primary full" disabled={authBusy}>{authBusy ? "WORKING..." : authMode === "signin" ? "SIGN IN" : "CREATE ACCOUNT"}</button>
+              </form>
+              <div className="auth-or"><span>OR</span></div>
+              <button className="secondary full anonymous-entry" onClick={handleAnonymous} disabled={authBusy}><Icon name="ghost" size={15} /> CONTINUE ANONYMOUSLY</button>
+              <small className="auth-footnote">Anonymous access uses a temporary account tied to this browser.</small>
+            </>
+          ) : (
+            <div className="form-error">Supabase is not configured for this deployment.</div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   const nav = [
     ["home", "house", "Home"],
@@ -287,248 +700,287 @@ function App() {
     ["connections", "heart", "Connections"],
     ["messages", "message-circle", "Messages"],
     ["rooms", "panels-top-left", "Rooms"],
-    ["games", "gamepad-2", "Games"]
   ];
-
-  function nextPerson() {
-    if (isMatching) return;
-    setLiked(false);
-    setSent([]);
-    setMessage("");
-    goSocial("random");
-    setIsMatching(true);
-  }
-
-  function sendMessage(e) {
-    e.preventDefault();
-    if (isMatching) return;
-    const trimmed = message.trim();
-    if (!trimmed) return;
-    setSent(v => [...v, { side: "me", text: trimmed, time: "now" }]);
-    setMessage("");
-    window.setTimeout(() => {
-      setSent(v => [...v, {
-        side: "them",
-        text: trimmed.toLowerCase().includes("where") ? `I'm from ${person.country} 👀` : "haha I hear you 😂",
-        time: "now"
-      }]);
-    }, 900);
-  }
 
   return (
     <>
-      {showWelcome && (
-        <div className="welcome-screen splash-screen" aria-hidden="true">
-          <div className="welcome-bubble">
-            <span className="welcome-dot dot-a" />
-            <span className="welcome-dot dot-b" />
-            <span className="welcome-dot dot-c" />
-            <div className="welcome-logo">E</div>
-          </div>
-          <div className="welcome-wordmark">ELSEWHR</div>
-          <div className="welcome-tag">GO SOMEWHERE ELSE.</div>
-        </div>
-      )}
-      <div className={`app-shell ${!authUser ? "locked-shell" : ""}`}>
-      <aside className="sidebar">
-        <button className="brand" onClick={() => navigateTo("home")}>
-          <span className="brand-mark">E</span>
-          <span>ELSEWHR</span>
-        </button>
-
-        <div className="side-section">
-          <span className="side-label">EXPLORE</span>
-          {nav.map(([key, icon, label]) => (
-            <button key={key} className={`nav-item ${page === key ? "active" : ""}`} onClick={() => key === "home" ? navigateTo("home") : goSocial(key)}>
-              <span className="nav-icon"><Icon name={icon} /></span><span>{label}</span>
-            </button>
-          ))}
-        </div>
-
-        <div className="side-section">
-          <span className="side-label">NEXT</span>
-          <button className="genesis-nav" onClick={() => setShowGenesis(true)}>
-            <span className="nav-icon"><Icon name="sparkles" /></span>
-            <span>
-              <strong>GENESIS</strong>
-              <small>Coming soon</small>
-            </span>
+      <div className="app-shell">
+        <aside className="sidebar">
+          <button className="brand" onClick={() => navigateTo("home")}>
+            <span className="brand-mark">E</span><span>ELSEWHR</span>
           </button>
-        </div>
 
-        <div className="sidebar-bottom">
-          <button className="nav-item" onClick={() => setShowProfile(true)}><span className="nav-icon"><Icon name="user-circle-2" /></span><span>My Profile</span></button>
-          <button className="nav-item" onClick={() => setShowPlus(true)}><span className="nav-icon"><Icon name="sparkles" /></span><span>ELSEWHR+</span></button>
-        </div>
-      </aside>
+          <div className="side-section">
+            <span className="side-label">EXPLORE</span>
+            {nav.map(([key, icon, label]) => (
+              <button key={key} className={"nav-item " + (page === key ? "active" : "")} onClick={() => key === "home" ? navigateTo("home") : goSocial(key)}>
+                <span className="nav-icon"><Icon name={icon} /></span><span>{label}</span>
+              </button>
+            ))}
+          </div>
 
-      <main className="main">
-        <header className="topbar">
-          <div className="mobile-brand">ELSEWHR</div>
-          <div className="online-pill"><span className="status-dot" /> People are elsewhere right now</div>
-          <div className="top-actions">
-            <button onClick={() => setShowPlus(true)}><Icon name="sparkles" size={14} /> Get Plus</button>
-            {!authUser ? (
-              <>
-                <button className="top-signin" onClick={() => { setAuthMode("signin"); setShowProfile(true); }}>Sign in</button>
-                <button className="top-signup" onClick={() => { setAuthMode("signup"); setShowProfile(true); }}>Sign up</button>
-              </>
-            ) : (
-              <button className="avatar-button" onClick={() => setShowProfile(true)}>{(profile?.display_name || profile?.username || (isAnonymous ? "G" : authEmail) || "E").slice(0,1).toUpperCase()}</button>
+          <div className="sidebar-bottom">
+            <button className="nav-item" onClick={() => setShowProfile(true)}><span className="nav-icon"><Icon name="user-circle-2" /></span><span>My Profile</span></button>
+            <button className="nav-item" onClick={() => setShowPlus(true)}><span className="nav-icon"><Icon name="sparkles" /></span><span>ELSEWHR+</span></button>
+          </div>
+        </aside>
+
+        <main className="main">
+          <header className="topbar">
+            <div className="mobile-brand">ELSEWHR</div>
+            <div className="online-pill"><span className="status-dot" /> {onlineCount} people online</div>
+            <div className="top-actions">
+              <button onClick={() => setShowPlus(true)}><Icon name="sparkles" size={14} /> Get Plus</button>
+              <button className="avatar-button" onClick={() => setShowProfile(true)}>{initials(profile || { username: isAnonymous ? "guest" : authUser.email })}</button>
+            </div>
+          </header>
+
+          {dataError && (
+            <div className="live-error">
+              <Icon name="circle-alert" size={14} /> {dataError}
+            </div>
+          )}
+
+          <div className={"content page-transition " + pageMotion} key={page}>
+            {page === "home" && (
+              <section className="hero-page">
+                <div className="eyebrow">LIVE ELSEWHERE</div>
+                <h1>Someone,<br /><span>somewhere,</span><br />is waiting.</h1>
+                <p>Meet real people outside your usual world. Every profile, room, connection, and conversation on this surface comes from ELSEWHR live data.</p>
+                <div className="hero-actions">
+                  <button className="primary large" onClick={startRandomMatch}>GO ELSEWHR <Icon name="arrow-up-right" size={16} /></button>
+                  <button className="secondary large" onClick={() => goSocial("discover")}>DISCOVER PEOPLE</button>
+                </div>
+                <div className="hero-grid">
+                  <div><strong>{discoverPeople.length}</strong><span>discoverable members</span></div>
+                  <div><strong>{onlineCount}</strong><span>online now</span></div>
+                  <div><strong>{messageRooms.length}</strong><span>your live conversations</span></div>
+                </div>
+              </section>
+            )}
+
+            {page === "random" && (
+              <section className="chat-page">
+                {isMatching ? (
+                  <div className="matching-stage">
+                    <div className="matching-orbit"><span /><i /><b /></div>
+                    <span className="eyebrow">LIVE MATCHMAKING</span>
+                    <h2>Looking for someone.</h2>
+                    <p>Your queue is live. A room appears here the moment another eligible member matches with you.</p>
+                    <button className="secondary" onClick={stopRandomMatch}>LEAVE QUEUE</button>
+                  </div>
+                ) : activeRoom?.kind === "random" ? (
+                  <LiveChat
+                    activeRoom={activeRoom}
+                    activeOther={activeOther}
+                    activeMessages={activeMessages}
+                    authUser={authUser}
+                    message={message}
+                    setMessage={setMessage}
+                    onSend={handleSendMessage}
+                    onReport={() => setShowReport(true)}
+                    onMenu={() => setShowChatMenu(value => !value)}
+                    onLeave={handleLeaveRoom}
+                  />
+                ) : (
+                  <div className="empty-state full-state">
+                    <div className="empty-icon"><Icon name="radio" size={23} /></div>
+                    <span className="eyebrow">RANDOM CHAT</span>
+                    <h2>No active match.</h2>
+                    <p>Start a live match and ELSEWHR will create a real room when another eligible member is available.</p>
+                    <button className="primary" onClick={startRandomMatch}>START RANDOM CHAT</button>
+                  </div>
+                )}
+              </section>
+            )}
+
+            {page === "discover" && (
+              <section className="discover-page">
+                <div className="section-heading">
+                  <div><span className="eyebrow">DISCOVER</span><h2>Real people, right now.</h2></div>
+                  <div className="filter-row">
+                    <label><input type="checkbox" checked={discoverOnlineOnly} onChange={e => setDiscoverOnlineOnly(e.target.checked)} /> Online</label>
+                    <label><input type="checkbox" checked={discoverVerifiedOnly} onChange={e => setDiscoverVerifiedOnly(e.target.checked)} /> Verified</label>
+                  </div>
+                </div>
+
+                {currentDiscoverPerson ? (
+                  <div className="discover-layout">
+                    <div className="profile-card">
+                      <div className="profile-photo real-photo" style={currentDiscoverPerson.primary_photo_url ? { backgroundImage: "url(" + currentDiscoverPerson.primary_photo_url + ")" } : undefined}>
+                        {!currentDiscoverPerson.primary_photo_url && <div className="photo-fallback">{initials(currentDiscoverPerson)}</div>}
+                        {currentDiscoverPerson.verified_at && <div className="verified-placeholder"><Icon name="badge-check" size={17} /></div>}
+                        <div className="live-photo-meta">
+                          <strong>{personName(currentDiscoverPerson)}</strong>
+                          <span><i className={currentDiscoverPerson.online ? "online-dot" : "offline-dot"} /> {currentDiscoverPerson.online ? "Online now" : "Offline"}</span>
+                        </div>
+                      </div>
+                      <div className="profile-info">
+                        <div className="name-line">
+                          <h3>{personName(currentDiscoverPerson)}{currentDiscoverPerson.age ? ", " + currentDiscoverPerson.age : ""}</h3>
+                        </div>
+                        <span className="country-line">{currentDiscoverPerson.country || "Location not shared"}</span>
+                        {currentDiscoverPerson.bio && <p>{currentDiscoverPerson.bio}</p>}
+                        <div className="tags">
+                          {(currentDiscoverPerson.interests || []).slice(0, 8).map(tag => <span key={tag}>{tag}</span>)}
+                        </div>
+                        <div className="swipe-actions">
+                          <button className="round-button pass" onClick={() => setDiscoverIndex(value => value + 1)} aria-label="Next profile"><Icon name="x" size={22} /></button>
+                          <button className="round-button connect" onClick={() => handleConnect(currentDiscoverPerson)} aria-label="Connect"><Icon name="heart" size={21} /></button>
+                          <button className="round-button super" onClick={() => openConnection(currentDiscoverPerson)} aria-label="Message"><Icon name="message-circle" size={20} /></button>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="discover-side">
+                      <div className="quote-card">
+                        <span>LIVE PROFILE</span>
+                        <strong>{currentDiscoverPerson.online ? "Available right now." : "Recently active."}</strong>
+                        <small>Last profile update {timeLabel(currentDiscoverPerson.updated_at)}</small>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="empty-state">
+                    <div className="empty-icon"><Icon name="users-round" size={23} /></div>
+                    <span className="eyebrow">DISCOVER</span>
+                    <h2>No discoverable members yet.</h2>
+                    <p>There are no real profiles matching your filters right now.</p>
+                  </div>
+                )}
+              </section>
+            )}
+
+            {page === "connections" && (
+              <section className="simple-page">
+                <span className="eyebrow">CONNECTIONS</span>
+                <h2>Your real connections.</h2>
+                {connections.length ? (
+                  <div className="connection-grid">
+                    {connections.map(connection => (
+                      <article className="connection-card" key={connection.id}>
+                        <div className="conn-avatar real-small-avatar" style={connection.person.primary_photo_url ? { backgroundImage: "url(" + connection.person.primary_photo_url + ")" } : undefined}>
+                          {!connection.person.primary_photo_url && initials(connection.person)}
+                        </div>
+                        <div className="connection-main">
+                          <h3>{personName(connection.person)}</h3>
+                          <span>{connection.person.country || "Location not shared"} · {connection.status}</span>
+                        </div>
+                        <div className="connection-actions">
+                          {connection.status === "pending" && connection.direction === "incoming" && (
+                            <>
+                              <button onClick={() => handleConnectionStatus(connection.id, "accepted")}>ACCEPT</button>
+                              <button className="secondary-mini" onClick={() => handleConnectionStatus(connection.id, "rejected")}>DECLINE</button>
+                            </>
+                          )}
+                          {connection.status === "accepted" && <button onClick={() => openConnection(connection.person)}>CHAT</button>}
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="empty-state">
+                    <div className="empty-icon"><Icon name="heart" size={23} /></div>
+                    <span className="eyebrow">CONNECTIONS</span>
+                    <h2>No connections yet.</h2>
+                    <p>Connect with a real profile in Discover and your connections will appear here.</p>
+                    <button className="primary" onClick={() => navigateTo("discover")}>OPEN DISCOVER</button>
+                  </div>
+                )}
+              </section>
+            )}
+
+            {page === "messages" && (
+              <section className="messages-page">
+                {!activeRoom ? (
+                  <>
+                    <div className="section-heading">
+                      <div><span className="eyebrow">MESSAGES</span><h2>Your conversations.</h2></div>
+                    </div>
+                    {messageRooms.length ? (
+                      <div className="message-room-grid">
+                        {messageRooms.map(room => {
+                          const other = room.members?.find(member => member.user_id !== authUser.id)?.profile;
+                          return (
+                            <button className="message-room-card" key={room.id} onClick={() => openRoom(room.id)}>
+                              <div className="conn-avatar real-small-avatar" style={other?.primary_photo_url ? { backgroundImage: "url(" + other.primary_photo_url + ")" } : undefined}>
+                                {!other?.primary_photo_url && initials(other || { username: room.kind })}
+                              </div>
+                              <div>
+                                <strong>{room.kind === "random" ? personName(other) : room.title || personName(other)}</strong>
+                                <span>{room.latest_message?.body || "No messages yet."}</span>
+                              </div>
+                              <small>{timeLabel(room.latest_message?.created_at || room.created_at)}</small>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="empty-state">
+                        <div className="empty-icon"><Icon name="message-circle" size={23} /></div>
+                        <span className="eyebrow">MESSAGES</span>
+                        <h2>No conversations yet.</h2>
+                        <p>Your messages will appear here after you open a real room or connection.</p>
+                        <button className="primary" onClick={() => navigateTo("discover")}>DISCOVER PEOPLE</button>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <LiveChat
+                    activeRoom={activeRoom}
+                    activeOther={activeOther}
+                    activeMessages={activeMessages}
+                    authUser={authUser}
+                    message={message}
+                    setMessage={setMessage}
+                    onSend={handleSendMessage}
+                    onReport={() => setShowReport(true)}
+                    onMenu={() => setShowChatMenu(value => !value)}
+                    onLeave={handleLeaveRoom}
+                  />
+                )}
+              </section>
+            )}
+
+            {page === "rooms" && (
+              <section className="simple-page">
+                <div className="section-heading">
+                  <div><span className="eyebrow">ROOMS</span><h2>Live public rooms.</h2></div>
+                </div>
+                <form className="room-create-card" onSubmit={handleCreateRoom}>
+                  <div>
+                    <strong>Create a public room</strong>
+                    <span>Give people a real place to talk.</span>
+                  </div>
+                  <input value={roomTitle} onChange={e => setRoomTitle(e.target.value)} required maxLength={80} placeholder="Room name" />
+                  <input value={roomDescription} onChange={e => setRoomDescription(e.target.value)} maxLength={180} placeholder="What is this room about?" />
+                  <button className="primary" disabled={roomBusy}>{roomBusy ? "CREATING..." : "CREATE ROOM"}</button>
+                </form>
+                {groupRooms.length ? (
+                  <div className="room-grid">
+                    {groupRooms.map(room => {
+                      const joined = room.members?.some(member => member.user_id === authUser.id && !member.left_at);
+                      return (
+                        <article className="room-card" key={room.id}>
+                          <div className="room-card-top"><span className="eyebrow">PUBLIC ROOM</span><span>{room.members?.length || 0} live</span></div>
+                          <h3>{room.title || "Untitled room"}</h3>
+                          <p>{room.description || "No description."}</p>
+                          <button className="secondary" onClick={() => joined ? openRoom(room.id) : handleJoinRoom(room)}>{joined ? "OPEN ROOM" : "JOIN ROOM"}</button>
+                        </article>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="empty-state">
+                    <div className="empty-icon"><Icon name="panels-top-left" size={23} /></div>
+                    <span className="eyebrow">ROOMS</span>
+                    <h2>No public rooms yet.</h2>
+                    <p>Create the first live room for the community.</p>
+                  </div>
+                )}
+              </section>
             )}
           </div>
-        </header>
-
-        <div className={`content page-transition ${pageMotion}`} key={page}>
-          {page === "home" && (
-            <section className="hero-page">
-              <div className="eyebrow">THE INTERNET IS BIGGER THAN YOUR CIRCLE</div>
-              <h1>Someone,<br /><span>somewhere,</span><br />is waiting.</h1>
-              <p>Meet people outside your usual world. Talk, discover, connect, and decide what happens next.</p>
-              <div className="hero-actions">
-                <button className="primary large" onClick={() => goSocial("random")}>GO ELSEWHR <Icon name="arrow-up-right" size={16} /></button>
-                <button className="secondary large" onClick={() => goSocial("discover")}>DISCOVER PEOPLE</button>
-              </div>
-              <div className="hero-grid">
-                <div><strong>1 → 1</strong><span>Instant private chat</span></div>
-                <div><strong><Icon name="globe-2" size={20} /></strong><span>People anywhere</span></div>
-                <div><strong><Icon name="infinity" size={20} /></strong><span>Go somewhere else</span></div>
-              </div>
-            </section>
-          )}
-
-          {page === "random" && (
-            <section className="chat-page">
-              {isMatching ? (
-                <div className="matching-stage">
-                  <div className="matching-orbit"><span /><i /><b /></div>
-                  <span className="eyebrow">GO ELSEWHR</span>
-                  <h2>Finding someone for you.</h2>
-                  <p>Give it a moment. Your next conversation is loading.</p>
-                  <div className="matching-count">{matchSeconds}<span>sec</span></div>
-                  <div className="matching-bar"><span style={{ width: `${((5 - matchSeconds) / 5) * 100}%` }} /></div>
-                  <button className="secondary" onClick={() => setIsMatching(false)}>STAY HERE</button>
-                </div>
-              ) : (
-                <>
-                  <div className="chat-header">
-                    <div className="person-mini">
-                      <div className="mini-avatar" style={{background: person.gradient}}>{person.name[0]}</div>
-                      <div><strong>{person.name}_482</strong><span><i /> {person.country}</span></div>
-                    </div>
-                    <div className="chat-header-actions">
-                      <button onClick={() => setShowCall("voice")}><Icon name="phone" size={14} /> Voice</button>
-                      <button onClick={() => setShowCall("video")}><Icon name="video" size={14} /> Video</button>
-                      <button aria-label="More options" onClick={() => setShowChatMenu(v => !v)}><Icon name="ellipsis" size={16} /></button>
-                    </div>
-                  </div>
-
-                  <div className="chat-body">
-                    <div className="chat-intro">
-                      <div className="large-avatar" style={{background: person.gradient}}>{person.name[0]}</div>
-                      <h2>{person.name}_482</h2>
-                      <div className="meta">{person.flag} {person.country} · {person.vibe}</div>
-                      <div className="tags">{person.tags.map(tag => <span key={tag}>{tag}</span>)}</div>
-                    </div>
-
-                    <div className="message-stack">
-                      {currentMessages.map((m, i) => (
-                        <div key={i} className={`message-row ${m.side}`}>
-                          <div className="bubble">{m.text}<small>{m.time}</small></div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <form className="composer" onSubmit={sendMessage}>
-                    <button type="button" aria-label="Emoji" onClick={() => setShowComposerTool("emoji")}><Icon name="smile" size={17} /></button>
-                    <button type="button" title="Images" onClick={() => setShowComposerTool("image")}><Icon name="image" size={17} /></button>
-                    <button type="button" title="Voice note" onClick={() => setShowComposerTool("voice")}><Icon name="mic" size={17} /></button>
-                    <input value={message} onChange={e => setMessage(e.target.value)} placeholder="Message..." />
-                    <button className="send" aria-label="Send" type="submit"><Icon name="send" size={16} /></button>
-                  </form>
-
-                  <div className="chat-actions">
-                    <button className="next-button" onClick={nextPerson} disabled={isMatching}><Icon name="refresh-cw" size={15} /> NEXT</button>
-                    <button className={liked ? "liked" : ""} onClick={() => setLiked(v => !v)}><Icon name="heart" size={15} /> {liked ? "SAVED" : "SAVE"}</button>
-                    <button onClick={() => setShowReport(true)}><Icon name="flag" size={15} /> REPORT</button>
-                    <button onClick={() => navigateTo("home")}><Icon name="log-out" size={15} /> LEAVE</button>
-                  </div>
-                </>
-              )}
-            </section>
-          )}
-
-          {page === "discover" && (
-            <section className="discover-page">
-              <div className="section-heading">
-                <div><span className="eyebrow">DISCOVER</span><h2>Choose your elsewhere.</h2></div>
-                <button className="secondary" onClick={() => setShowPlus(true)}>Unlock more filters <Icon name="sparkles" size={14} /></button>
-              </div>
-              <div className="discover-layout">
-                <div className="profile-card">
-                  <div className="profile-photo" style={{background: person.gradient}}>
-                    {person.verified && <div className="verified-placeholder"><Icon name="badge-check" size={17} /></div>}
-                    <div className="photo-caption">{person.name}</div>
-                  </div>
-                  <div className="profile-info">
-                    <div className="name-line"><h3>{person.name}, {person.age}</h3><span>{person.flag}</span></div>
-                    <span className="country-line">{person.country}</span>
-                    <p>{person.bio}</p>
-                    <div className="tags">{person.tags.map(tag => <span key={tag}>{tag}</span>)}</div>
-                    <div className="swipe-actions">
-                      <button className="round-button pass" onClick={nextPerson} aria-label="Pass"><Icon name="x" size={22} /></button>
-                      <button className="round-button super" onClick={() => setShowPlus(true)} aria-label="Super connect"><Icon name="sparkles" size={20} /></button>
-                      <button className="round-button connect" onClick={() => { setLiked(true); navigateTo("connections"); }} aria-label="Connect"><Icon name="heart" size={21} /></button>
-                    </div>
-                  </div>
-                </div>
-                <div className="discover-side">
-                  <div className="filter-card">
-                    <div className="filter-title">QUICK FILTERS</div>
-                    <label><input type="checkbox" /> Online now</label>
-                    <label><input type="checkbox" /> Verified</label>
-                    <label><input type="checkbox" /> Music</label>
-                    <label><input type="checkbox" /> Gaming</label>
-                    <button className="filter-plus" onClick={() => setShowPlus(true)}>Advanced filters are a Plus feature <Icon name="arrow-up-right" size={13} /></button>
-                  </div>
-                  <div className="quote-card">
-                    <span>ELSEWHR THOUGHT</span>
-                    <strong>Don't just meet people. Find conversations you remember.</strong>
-                  </div>
-                </div>
-              </div>
-            </section>
-          )}
-
-          {page === "connections" && (
-            <section className="simple-page">
-              <span className="eyebrow">CONNECTIONS</span>
-              <h2>People you decided to keep.</h2>
-              <div className="connection-grid">
-                {discoverPeople.slice(0,3).map((p, i) => (
-                  <article className="connection-card" key={p.name}>
-                    <div className="conn-avatar" style={{background:p.gradient}}>{p.name[0]}</div>
-                    <div><h3>{p.name}</h3><span>{p.flag} {p.country}</span></div>
-                    <button onClick={() => navigateTo("random")}>CHAT</button>
-                  </article>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {["messages","rooms","games"].includes(page) && (
-            <section className="simple-page">
-              <span className="eyebrow">{page.toUpperCase()}</span>
-              <h2>{page === "messages" ? "Your conversations live here." : page === "rooms" ? "Find a room worth staying in." : "Talk is better with games."}</h2>
-              <div className="coming-grid">
-                <div><strong>{page === "messages" ? "Messages" : page === "rooms" ? "Public rooms" : "Mini games"}</strong><span>Prototype surface ready. Realtime features connect next.</span></div>
-                <div><strong>Genesis</strong><span>Private-space experience is coming later.</span></div>
-              </div>
-            </section>
-          )}
-        </div>
-      </main>
+        </main>
 
         <nav className="mobile-nav" aria-label="Mobile navigation">
           {[
@@ -539,98 +991,64 @@ function App() {
             ["profile", "user-circle-2", "My Profile"]
           ].map(([key, icon, label]) => (
             <button key={key} className={page === key ? "active" : ""} onClick={() => key === "profile" ? setShowProfile(true) : goSocial(key)}>
-              <Icon name={icon} size={17} />
-              <span>{label}</span>
+              <Icon name={icon} size={17} /><span>{label}</span>
             </button>
           ))}
         </nav>
+      </div>
 
       {showProfile && (
         <div className="modal-backdrop" onMouseDown={() => setShowProfile(false)}>
           <div className="modal profile-modal" onMouseDown={e => e.stopPropagation()}>
-            <div className="modal-top"><span className="eyebrow">{authUser ? (isAnonymous ? "ANONYMOUS" : "MY PROFILE") : authMode === "signup" ? "JOIN ELSEWHR" : "WELCOME BACK"}</span>{authUser && isAnonymous && <span className="guest-badge">GUEST</span>}<button onClick={() => setShowProfile(false)} aria-label="Close"><Icon name="x" size={16} /></button></div>
-            <h2>{authUser ? (isAnonymous ? "You're here anonymously." : "Your ELSEWHR profile.") : authMode === "signup" ? "Meet someone you would've never met." : "Good to see you again."}</h2>
-            <p className="modal-copy">{authUser ? (isAnonymous ? "You can explore ELSEWHR without sharing your email. Create an account later to keep a permanent identity." : "Manage your profile, sign out, or permanently delete your account.") : "A real primary photo helps us keep ELSEWHR human and reduces fake, explicit, and spam-heavy profiles."}</p>
-            {!supabaseConfigured && <div className="verification-callout"><span><Icon name="info" size={18} /></span><div><strong>Prototype mode</strong><p>Connect the Supabase environment to enable real accounts, profile storage and realtime features.</p></div></div>}
-            {supabaseConfigured && !authUser && (
-              <form onSubmit={handleAuth} className="auth-form">
-                <div className="auth-toggle"><button type="button" className={authMode === "signin" ? "selected" : ""} onClick={() => setAuthMode("signin")}>Sign in</button><button type="button" className={authMode === "signup" ? "selected" : ""} onClick={() => setAuthMode("signup")}>Sign up</button></div>
-                <label>Email<input type="email" required value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder="you@example.com" /></label>
-                <label>Password<input type="password" minLength={8} required value={authPassword} onChange={e => setAuthPassword(e.target.value)} placeholder="At least 8 characters" /></label>
-                {accountError && <div className="form-error">{accountError}</div>}
-                <button className="primary full" disabled={authBusy}>{authBusy ? "WORKING..." : authMode === "signin" ? "SIGN IN" : "CREATE ACCOUNT"}</button>
-              </form>
-            )}
-            {supabaseConfigured && authUser && isAnonymous && (
+            <div className="modal-top">
+              <span className="eyebrow">{isAnonymous ? "ANONYMOUS" : "MY PROFILE"}</span>
+              <button onClick={() => setShowProfile(false)} aria-label="Close"><Icon name="x" size={16} /></button>
+            </div>
+            <h2>{isAnonymous ? "You're browsing anonymously." : "Your ELSEWHR profile."}</h2>
+            <p className="modal-copy">{isAnonymous ? "Create a permanent account to appear in Discover and use live random chat." : "Keep your live identity current and control your account."}</p>
+
+            {!supabaseConfigured ? (
+              <div className="form-error">Supabase is not configured for this deployment.</div>
+            ) : isAnonymous ? (
               <div className="guest-profile">
-                <div className="guest-card"><div className="guest-symbol"><Icon name="user-round" size={20} /></div><div><strong>Anonymous guest</strong><span>This account is temporary and tied to this browser session.</span></div></div>
+                <div className="guest-card"><div className="guest-symbol"><Icon name="user-round" size={20} /></div><div><strong>Anonymous guest</strong><span>This temporary account is tied to this browser session.</span></div></div>
                 <div className="profile-buttons guest-actions">
-                  <button type="button" className="primary" onClick={() => { setAuthMode("signup"); setAuthUser(null); signOut().catch(() => {}); }}>CREATE ACCOUNT</button>
-                  <button type="button" className="secondary" onClick={() => signOut().catch(() => {})}>LEAVE ELSEWHR</button>
-                  <button type="button" className="danger-button" disabled={deleteBusy} onClick={handleDeleteAccount}>{deleteBusy ? "DELETING..." : "DELETE ANONYMOUS ACCOUNT"}</button>
+                  <button className="primary" onClick={() => { setAuthMode("signup"); setShowProfile(false); setAccountError(""); signOut().catch(() => {}); setAuthUser(null); }}>CREATE ACCOUNT</button>
+                  <button className="secondary" onClick={() => signOut().catch(() => {})}>LEAVE ELSEWHR</button>
+                  <button className="danger-button" disabled={deleteBusy} onClick={handleDeleteAccount}>{deleteBusy ? "DELETING..." : "DELETE ACCOUNT"}</button>
                 </div>
               </div>
-            )}
-            {supabaseConfigured && authUser && !isAnonymous && (
+            ) : (
               <form onSubmit={handleProfileSave}>
                 <div className="photo-upload">
-                  <div className="upload-avatar photo-preview" style={profilePreview ? { backgroundImage: `url(${profilePreview})` } : undefined}>
+                  <div className="upload-avatar photo-preview" style={profilePreview ? { backgroundImage: "url(" + profilePreview + ")" } : undefined}>
                     {!profilePreview && <Icon name="image-plus" size={21} />}
                   </div>
                   <div><strong>{profilePreview ? "Primary photo" : "Add your picture"}</strong><span>One real person · required for discovery</span></div>
                   <label className="upload-button">Choose<input type="file" accept="image/png,image/jpeg,image/webp" onChange={e => {
-                    const file = e.target.files?.[0] ?? null;
-                    setProfileFile(file);
-                    if (file) setProfilePreview(URL.createObjectURL(file));
+                    const selected = e.target.files?.[0] || null;
+                    setProfileFile(selected);
+                    if (selected) setProfilePreview(URL.createObjectURL(selected));
                   }} hidden /></label>
                 </div>
-                <div className="profile-form-grid">
-                  <label>Username<input id="profile-username" required minLength={3} maxLength={24} placeholder="your_username" defaultValue={profile?.username ?? ""} /></label>
-                  <label>Display name<input id="profile-display-name" placeholder="Your name" defaultValue={profile?.display_name ?? ""} /></label>
-                  <label>Age<input id="profile-age" required type="number" min="18" max="120" placeholder="18+" defaultValue={profile?.age ?? ""} /></label>
-                  <label>Country<input id="profile-country" placeholder="Botswana" defaultValue={profile?.country ?? ""} /></label>
-                  <label>Language<input defaultValue="English" /></label>
-                </div>
-                <label className="profile-wide">Bio<textarea id="profile-bio" rows="3" placeholder="Tell people what you're into...">{profile?.bio ?? ""}</textarea></label>
-                {accountError && <div className="form-error">{accountError}</div>}
-                <div className="verification-callout">
-                  <span><Icon name="shield-check" size={18} /></span>
-                  <div><strong>Verification</strong><p>ELSEWHR+ will include identity verification and verified-only discovery.</p></div>
-                </div>
-                <div className="profile-buttons"><button className="primary" disabled={profileSaving}>{profileSaving ? "SAVING..." : "SAVE PROFILE"}</button><button type="button" className="secondary" onClick={() => signOut().then(() => setAuthUser(null))}>SIGN OUT</button><button type="button" className="danger-button" disabled={deleteBusy} onClick={handleDeleteAccount}>{deleteBusy ? "DELETING..." : "DELETE ACCOUNT"}</button></div>
-              </form>
-            )}
-          </div>
-        </div>
-      )}
 
-      {!authChecked || (!authUser && !showWelcome) && (
-        <div className="auth-gate" role="dialog" aria-modal="true" aria-labelledby="auth-gate-title">
-          <div className="auth-gate-inner">
-            {!authChecked ? (
-              <>
-                <div className="auth-gate-logo"><span className="brand-mark">E</span><strong>ELSEWHR</strong></div>
-                <span className="eyebrow">ELSEWHR</span>
-                <h1>Getting you there.</h1>
-                <p>Connecting your session before you enter.</p>
-              </>
-            ) : (
-              <>
-            <div className="auth-gate-logo"><span className="brand-mark">E</span><strong>ELSEWHR</strong></div>
-            <span className="eyebrow">{authMode === "signup" ? "JOIN ELSEWHR" : "WELCOME BACK"}</span>
-            <h1 id="auth-gate-title">{authMode === "signup" ? "Go somewhere else." : "The internet is bigger than your circle."}</h1>
-            <p>Sign in, create your account, or enter anonymously to explore ELSEWHR.</p>
-            <form onSubmit={handleAuth} className="auth-form auth-gate-form">
-              <div className="auth-toggle"><button type="button" className={authMode === "signin" ? "selected" : ""} onClick={() => { setAuthMode("signin"); setAccountError(""); }}>Sign in</button><button type="button" className={authMode === "signup" ? "selected" : ""} onClick={() => { setAuthMode("signup"); setAccountError(""); }}>Sign up</button></div>
-              <label>Email<input type="email" required value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder="you@example.com" /></label>
-              <label>Password<input type="password" minLength={8} required value={authPassword} onChange={e => setAuthPassword(e.target.value)} placeholder="At least 8 characters" /></label>
-              {accountError && <div className="form-error">{accountError}</div>}
-              <button className="primary full" disabled={authBusy}>{authBusy ? "WORKING..." : authMode === "signin" ? "SIGN IN" : "CREATE ACCOUNT"}</button>
-            </form>
-            <div className="auth-or"><span>OR</span></div>
-            <button className="secondary full anonymous-entry" onClick={handleAnonymous} disabled={authBusy}><Icon name="ghost" size={15} /> CONTINUE ANONYMOUSLY</button>
-            <small className="auth-footnote">Anonymous access creates a temporary account. You can create a permanent account later.</small>
-              </>
+                <div className="profile-form-grid">
+                  <label>Username<input id="profile-username" required minLength={3} maxLength={24} defaultValue={profile?.username || ""} /></label>
+                  <label>Display name<input id="profile-display-name" defaultValue={profile?.display_name || ""} /></label>
+                  <label>Age<input id="profile-age" required type="number" min="18" max="120" defaultValue={profile?.age || ""} /></label>
+                  <label>Country<input id="profile-country" defaultValue={profile?.country || ""} /></label>
+                  <label>Language<input id="profile-language" defaultValue={profile?.languages?.[0] || "English"} /></label>
+                  <label>Interests<input id="profile-interests" defaultValue={(profile?.interests || []).join(", ")} placeholder="Music, gaming, books" /></label>
+                </div>
+
+                <label className="profile-wide">Bio<textarea id="profile-bio" rows="3" defaultValue={profile?.bio || ""} placeholder="Tell people what you're into..." /></label>
+                {accountError && <div className="form-error">{accountError}</div>}
+                <div className="profile-buttons">
+                  <button className="primary" disabled={profileSaving}>{profileSaving ? "SAVING..." : "SAVE PROFILE"}</button>
+                  <button type="button" className="secondary" onClick={() => signOut().then(() => { setAuthUser(null); setShowProfile(false); })}>SIGN OUT</button>
+                  <button type="button" className="danger-button" disabled={deleteBusy} onClick={handleDeleteAccount}>{deleteBusy ? "DELETING..." : "DELETE ACCOUNT"}</button>
+                </div>
+              </form>
             )}
           </div>
         </div>
@@ -641,44 +1059,18 @@ function App() {
           <div className="modal plus-modal" onMouseDown={e => e.stopPropagation()}>
             <div className="modal-top"><span className="plus-badge"><Icon name="sparkles" size={12} /> ELSEWHR+</span><button onClick={() => setShowPlus(false)} aria-label="Close"><Icon name="x" size={16} /></button></div>
             <h2>Make ELSEWHR yours.</h2>
-            <p className="modal-copy">More control over who you meet, how you appear, and how you stay connected.</p>
+            <p className="modal-copy">A subscription for deeper controls and premium account features.</p>
             <div className="plan-toggle">
               <button className={plusPlan === "monthly" ? "selected" : ""} onClick={() => setPlusPlan("monthly")}><strong>$1.99</strong><span>monthly</span></button>
               <button className={plusPlan === "yearly" ? "selected" : ""} onClick={() => setPlusPlan("yearly")}><strong>$19.99</strong><span>yearly · save 16%</span></button>
             </div>
             <div className="plus-grid">
-              {["Identity verification","Advanced Discover filters","Unlimited Discover","Who liked you","Persistent images","HD video calls","Custom profiles","Premium themes","Saved conversations","Private rooms","Advanced stats","Ad-free"].map(item => <div key={item}><Icon name="check" size={13} /> {item}</div>)}
+              {["Identity verification","Advanced Discover filters","Unlimited Discover","Persistent images","HD video calls","Custom profiles","Premium themes","Saved conversations","Private rooms","Advanced stats","Ad-free"].map(item => <div key={item}><Icon name="check" size={13} /> {item}</div>)}
             </div>
-            <button className="paypal-button" onClick={() => handlePlusCheckout(plusPlan)} disabled={paymentBusy}>{paymentBusy ? "OPENING PAYPAL..." : `CONTINUE WITH PAYPAL · ${plusPlan === "monthly" ? "$1.99/mo" : "$19.99/yr"}`}</button>
-            <small className="trial-note">Secure subscription checkout · cancel anytime</small>{paymentError && <div className="form-error">{paymentError}</div>}
+            <button className="paypal-button" onClick={() => handlePlusCheckout(plusPlan)} disabled={paymentBusy}>{paymentBusy ? "OPENING PAYPAL..." : "CONTINUE WITH PAYPAL · " + (plusPlan === "monthly" ? "$1.99/mo" : "$19.99/yr")}</button>
+            <small className="trial-note">Secure subscription checkout · cancel anytime</small>
+            {paymentError && <div className="form-error">{paymentError}</div>}
           </div>
-        </div>
-      )}
-
-      {showGenesis && (
-        <div className="modal-backdrop" onMouseDown={() => setShowGenesis(false)}>
-          <div className="modal genesis-modal" onMouseDown={e => e.stopPropagation()}>
-            <div className="genesis-symbol"><Icon name="sparkles" size={24} /></div>
-            <span className="eyebrow">GENESIS</span>
-            <h2>A different kind of connection is coming.</h2>
-            <p className="modal-copy">A future private space for deeper connections. For now, Genesis stays intentionally quiet.</p>
-            <button className="primary full" onClick={() => setShowGenesis(false)}><Icon name="arrow-left" size={15} /> BACK TO ELSEWHR</button>
-          </div>
-        </div>
-      )}
-
-
-      {showChatMenu && (
-        <div className="chat-menu" onMouseDown={() => setShowChatMenu(false)}>
-          <button onClick={() => { setShowReport(true); setShowChatMenu(false); }}><Icon name="flag" size={14} /> Report person</button>
-          <button onClick={() => { setToast("Blocking will be connected to your account settings next."); setShowChatMenu(false); }}><Icon name="shield-ban" size={14} /> Block person</button>
-        </div>
-      )}
-
-      {showComposerTool && (
-        <div className="mini-notice" onClick={() => setShowComposerTool("")}>
-          <Icon name={showComposerTool === "image" ? "image" : showComposerTool === "voice" ? "mic" : "smile"} size={14} />
-          {showComposerTool === "image" ? "Image sharing is being connected." : showComposerTool === "voice" ? "Voice notes are being connected." : "Emoji picker is coming next."}
         </div>
       )}
 
@@ -686,34 +1078,77 @@ function App() {
         <div className="modal-backdrop" onMouseDown={() => setShowReport(false)}>
           <div className="modal report-modal" onMouseDown={e => e.stopPropagation()}>
             <div className="modal-top"><span className="eyebrow">SAFETY</span><button onClick={() => setShowReport(false)} aria-label="Close"><Icon name="x" size={16} /></button></div>
-            <h2>Report this person.</h2>
-            <p className="modal-copy">Tell us what happened. Reporting is always free.</p>
+            <h2>Report this member.</h2>
+            <p className="modal-copy">Reports are stored on your ELSEWHR account for moderation.</p>
             <div className="report-options">
               {["Sexual or explicit content","Scam or money request","Harassment","Fake identity","Threat or danger","Underage concern","Something else"].map(reason => (
-                <button key={reason} onClick={() => setShowReport(false)}><span>{reason}</span><Icon name="chevron-right" size={15} /></button>
+                <button key={reason} disabled={reportBusy} onClick={() => handleReport(reason)}><span>{reason}</span><Icon name="chevron-right" size={15} /></button>
               ))}
             </div>
           </div>
         </div>
       )}
 
-      {showCall && (
-        <div className="modal-backdrop call-layer">
-          <div className="call-modal">
-            <div className="call-top"><span>ELSEWHR · {showCall.toUpperCase()}</span><span>CALL UI PREVIEW</span></div>
-            <div className="call-stage" style={{background: person.gradient}}>
-              <div className="call-name">{person.name}_482</div><div className="call-note">Live calling connects after WebRTC signaling is enabled.</div>
-              {showCall === "video" && <div className="self-preview">YOU</div>}
-            </div>
-            <div className="call-controls">
-              <button aria-label="Mute"><Icon name="mic-off" size={18} /></button><button aria-label="Camera"><Icon name="video" size={18} /></button><button className="end-call" onClick={() => setShowCall(null)} aria-label="End call"><Icon name="phone-off" size={18} /></button>
-            </div>
-          </div>
+      {showChatMenu && activeOther && (
+        <div className="chat-menu" onMouseDown={() => setShowChatMenu(false)}>
+          <button onClick={() => { setShowReport(true); setShowChatMenu(false); }}><Icon name="flag" size={14} /> Report member</button>
+          <button onClick={handleBlock}><Icon name="shield-ban" size={14} /> Block member</button>
         </div>
       )}
+
       {toast && <div className="toast">{toast}</div>}
-      </div>
     </>
+  );
+}
+
+function LiveChat({ activeRoom, activeOther, activeMessages, authUser, message, setMessage, onSend, onReport, onMenu, onLeave }) {
+  return (
+    <section className="chat-page live-chat">
+      <div className="chat-header">
+        <div className="person-mini">
+          <div className="mini-avatar real-small-avatar" style={activeOther?.primary_photo_url ? { backgroundImage: "url(" + activeOther.primary_photo_url + ")" } : undefined}>
+            {!activeOther?.primary_photo_url && initials(activeOther || { username: activeRoom.title || activeRoom.kind })}
+          </div>
+          <div>
+            <strong>{activeRoom.kind === "group" ? (activeRoom.title || "Room") : personName(activeOther)}</strong>
+            <span><i /> {activeRoom.kind === "group" ? "Public room" : (activeOther?.country || "ELSEWHR member")}</span>
+          </div>
+        </div>
+        <div className="chat-header-actions">
+          <button aria-label="More options" onClick={onMenu}><Icon name="ellipsis" size={16} /></button>
+        </div>
+      </div>
+
+      <div className="chat-body">
+        <div className="chat-intro">
+          <div className="large-avatar real-avatar" style={activeOther?.primary_photo_url ? { backgroundImage: "url(" + activeOther.primary_photo_url + ")" } : undefined}>
+            {!activeOther?.primary_photo_url && initials(activeOther || { username: activeRoom.title || activeRoom.kind })}
+          </div>
+          <h2>{activeRoom.kind === "group" ? (activeRoom.title || "Room") : personName(activeOther)}</h2>
+          <div className="meta">{activeRoom.kind === "group" ? (activeRoom.description || "Live public room") : (activeOther?.country || "ELSEWHR member")}</div>
+        </div>
+
+        <div className="message-stack">
+          {activeMessages.length ? activeMessages.map(item => (
+            <div key={item.id} className={"message-row " + (item.sender_id === authUser.id ? "me" : "them")}>
+              <div className="bubble">{item.media_type ? <span>{item.media_type} message</span> : item.body}<small>{timeLabel(item.created_at)}</small></div>
+            </div>
+          )) : (
+            <div className="room-empty-line">No messages in this room yet.</div>
+          )}
+        </div>
+      </div>
+
+      <form className="composer" onSubmit={onSend}>
+        <input value={message} onChange={e => setMessage(e.target.value)} placeholder="Message..." />
+        <button className="send" aria-label="Send" type="submit"><Icon name="send" size={16} /></button>
+      </form>
+
+      <div className="chat-actions">
+        <button onClick={onReport}><Icon name="flag" size={15} /> REPORT</button>
+        <button onClick={onLeave}><Icon name="log-out" size={15} /> LEAVE</button>
+      </div>
+    </section>
   );
 }
 
