@@ -26,6 +26,17 @@ export async function signOut() {
   if (error) throw error;
 }
 
+export async function getProfile(userId) {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, username, display_name, age, country, languages, interests, bio, primary_photo_path, primary_photo_url, discoverable, online_visible, verified_at, is_plus")
+    .eq("id", userId)
+    .maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
 export async function saveProfile(profile) {
   if (!supabase) throw new Error("Supabase is not configured.");
   const { data, error } = await supabase
