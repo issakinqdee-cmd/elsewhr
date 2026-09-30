@@ -1446,6 +1446,9 @@ function App() {
                             openReactionId={openReactionId}
                             onConnect={handleConnect}
                             onSend={handleSendMessage}
+                            onSendAttachment={handleSendAttachment}
+                            attachmentBusy={attachmentBusy}
+                            onNotify={addNotification}
                             onStartReply={startReply}
                             onStartEdit={startEdit}
                             onCancelEdit={cancelMessageEdit}
@@ -2041,6 +2044,8 @@ function LiveChat({
   isPlus,
   onShowPlus,
   onNotify,
+  onSendAttachment,
+  attachmentBusy,
   activeMessages,
   authUser,
   message,
