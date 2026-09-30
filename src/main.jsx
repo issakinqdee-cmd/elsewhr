@@ -1234,7 +1234,7 @@ function App() {
               <div className="guest-profile">
                 <div className="guest-card"><div className="guest-symbol"><Icon name="user-round" size={20} /></div><div><strong>Anonymous guest</strong><span>This temporary account is tied to this browser session.</span></div></div>
                 <div className="profile-buttons guest-actions">
-                  <button className="primary" onClick={() => { setAuthMode("signup"); setShowProfile(false); setAccountError(""); signOut().catch(() => {}); setAuthUser(null); }}>CREATE ACCOUNT</button>
+                  <button className="primary" onClick={() => { setAuthMode("signup"); setShowAuthForm(true); setShowProfile(false); setAccountError(""); signOut().catch(() => {}); setAuthUser(null); }}>CREATE ACCOUNT</button>
                   <button className="secondary" onClick={() => signOut().catch(() => {})}>LEAVE ELSEWHR</button>
                   <button className="danger-button" disabled={deleteBusy} onClick={handleDeleteAccount}>{deleteBusy ? "DELETING..." : "DELETE ACCOUNT"}</button>
                 </div>
