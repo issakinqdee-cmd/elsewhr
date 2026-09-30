@@ -2563,6 +2563,8 @@ function LiveChat({
               body: (payload.fromName || "Someone") + " wants to play " + item.title + ".",
               roomId: activeRoom.id,
               icon: item.icon || "gamepad-2",
+              action: "messages",
+              sourceId: "game-invite-" + payload.from + "-" + payload.gameId,
             });
           }
           return;
@@ -2590,6 +2592,15 @@ function LiveChat({
           setIncomingInvite(null);
           setTogetherReady(true);
           resetTogetherState(item.id, payload.starterId || payload.from);
+          onNotify?.({
+            type: "game",
+            title: "Game started",
+            body: item.title + " is live.",
+            roomId: activeRoom.id,
+            icon: item.icon || "gamepad-2",
+            action: "messages",
+            sourceId: "game-start-" + payload.from + "-" + item.id,
+          });
           if (item.id === "reaction") {
             const delay = Number(payload.delay) || 1900;
             resetTogetherState("reaction");
