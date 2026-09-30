@@ -1371,6 +1371,7 @@ function App() {
                 onStartReaction={startReactionGame}
                 onHitReaction={hitReaction}
                 onOpenGame={openGame}
+                onShowPlus={() => setShowPlus(true)}
               />
             )}
 
@@ -1640,7 +1641,7 @@ const GAME_CATALOG = [
   { id:"higher", title:"Higher or Lower", desc:"Call the next card.", icon:"arrow-up-down", premium:true },
 ];
 
-function GamesPage({ isPlus, game, setGame, rpsChoice, rpsResult, onRps, reactionScore, reactionActive, onStartReaction, onHitReaction, onOpenGame }) {
+function GamesPage({ isPlus, game, setGame, rpsChoice, rpsResult, onRps, reactionScore, reactionActive, onStartReaction, onHitReaction, onOpenGame, onShowPlus }) {
   return (
     <section className="games-page">
       <div className="section-heading games-heading">
@@ -1653,7 +1654,7 @@ function GamesPage({ isPlus, game, setGame, rpsChoice, rpsResult, onRps, reactio
 
       <div className="games-intro">
         <p>Three games are open to everyone. Thirteen more are part of ELSEWHR+.</p>
-        {!isPlus && <button className="secondary" onClick={() => document.querySelector(".plus-modal") ? null : null}>13 MORE WITH PLUS</button>}
+        {!isPlus && <button className="secondary" onClick={onShowPlus}>13 MORE WITH PLUS</button>}
       </div>
 
       <div className="games-grid">
@@ -1676,6 +1677,36 @@ function GamesPage({ isPlus, game, setGame, rpsChoice, rpsResult, onRps, reactio
 }
 
 function GameModal({ game, setGame, rpsChoice, rpsResult, onRps, reactionScore, reactionActive, onStartReaction, onHitReaction }) {
+  const [board, setBoard] = useState(Array(9).fill(""));
+  const [turn, setTurn] = useState("X");
+  const [winner, setWinner] = useState("");
+
+  useEffect(() => {
+    setBoard(Array(9).fill(""));
+    setTurn("X");
+    setWinner("");
+  }, [game?.id]);
+
+  function playTtt(index) {
+    if (board[index] || winner) return;
+    const next = [...board];
+    next[index] = turn;
+    const wins = [
+      [0,1,2],[3,4,5],[6,7,8],
+      [0,3,6],[1,4,7],[2,5,8],
+      [0,4,8],[2,4,6],
+    ];
+    const hit = wins.find(([a,b,c]) => next[a] && next[a] === next[b] && next[a] === next[c]);
+    if (hit) {
+      setWinner(turn);
+    } else if (next.every(Boolean)) {
+      setWinner("draw");
+    } else {
+      setTurn(turn === "X" ? "O" : "X");
+    }
+    setBoard(next);
+  }
+
   return (
     <div className="modal-backdrop" onMouseDown={() => setGame(null)}>
       <div className="modal game-modal" onMouseDown={e => e.stopPropagation()}>
@@ -1701,9 +1732,21 @@ function GameModal({ game, setGame, rpsChoice, rpsResult, onRps, reactionScore, 
             {reactionScore > 0 && <div className="game-result">{reactionScore} ms</div>}
             <button className="secondary" onClick={onStartReaction}>START ROUND</button>
           </div>
+        ) : game.id === "ttt" ? (
+          <div className="game-panel">
+            <p>{winner === "draw" ? "Draw." : winner ? winner + " wins." : "Two players. Take turns."}</p>
+            <div className="ttt-grid">
+              {board.map((cell, index) => (
+                <button key={index} type="button" onClick={() => playTtt(index)} className={cell ? "ttt-cell filled" : "ttt-cell"}>
+                  {cell}
+                </button>
+              ))}
+            </div>
+            {(winner || board.every(Boolean)) && <button className="secondary" onClick={() => { setBoard(Array(9).fill("")); setTurn("X"); setWinner(""); }}>NEW ROUND</button>}
+          </div>
         ) : (
           <div className="game-panel">
-            <div className="placeholder-game"><Icon name={game.icon} size={32} /><strong>{game.title}</strong><span>The ELSEWHR+ arcade slot is reserved for this game.</span></div>
+            <div className="placeholder-game"><Icon name={game.icon} size={32} /><strong>{game.title}</strong><span>This arcade game is reserved for ELSEWHR+.</span></div>
           </div>
         )}
       </div>
