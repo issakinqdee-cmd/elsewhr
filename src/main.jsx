@@ -879,7 +879,7 @@ function App() {
     return (
       <div className="auth-gate">
         <div className="auth-gate-inner">
-          <div className="auth-gate-logo"><span className="brand-mark">E</span><strong>ELSEWHR</strong></div>
+          <div className="auth-gate-logo"><BrandMark size={34} /><strong>ELSEWHR</strong></div>
           {!showAuthForm ? (
             <>
               <span className="eyebrow">GO SOMEWHERE ELSE</span>
