@@ -6,16 +6,18 @@ import { getCurrentUser, saveProfile, signInWithEmail, signOut, signUpWithEmail,
 import { startPaypalSubscription } from "./lib/paypal";
 
 const discoverPeople = [
-  { name: "Maya", age: 24, country: "South Africa", flag: "🇿🇦", vibe: "Music", tags: ["Music", "Movies", "Late Night"], bio: "Good conversations > small talk.", gradient: "linear-gradient(145deg,#f6c9b8,#6e4658)" },
-  { name: "Alex", age: 22, country: "USA", flag: "🇺🇸", vibe: "Gaming", tags: ["Gaming", "Tech", "Anime"], bio: "Probably awake when I shouldn't be.", gradient: "linear-gradient(145deg,#a9bfff,#433d72)" },
-  { name: "Amara", age: 25, country: "Nigeria", flag: "🇳🇬", vibe: "Deep", tags: ["Music", "Books", "Deep Talk"], bio: "Ask me something you actually care about.", gradient: "linear-gradient(145deg,#d0b1ff,#4d384e)" },
-  { name: "Kabelo", age: 23, country: "Botswana", flag: "🇧🇼", vibe: "Chill", tags: ["Basketball", "Music", "Memes"], bio: "Here for the random conversations.", gradient: "linear-gradient(145deg,#9ad6bd,#2d4c45)" }
+  { name: "Maya", age: 24, verified: false, country: "South Africa", flag: "🇿🇦", vibe: "Music", tags: ["Music", "Movies", "Late Night"], bio: "Good conversations > small talk.", gradient: "linear-gradient(145deg,#f6c9b8,#6e4658)" },
+  { name: "Alex", age: 22, verified: false, country: "USA", flag: "🇺🇸", vibe: "Gaming", tags: ["Gaming", "Tech", "Anime"], bio: "Probably awake when I shouldn't be.", gradient: "linear-gradient(145deg,#a9bfff,#433d72)" },
+  { name: "Amara", age: 25, verified: false, country: "Nigeria", flag: "🇳🇬", vibe: "Deep", tags: ["Music", "Books", "Deep Talk"], bio: "Ask me something you actually care about.", gradient: "linear-gradient(145deg,#d0b1ff,#4d384e)" },
+  { name: "Kabelo", age: 23, verified: false, country: "Botswana", flag: "🇧🇼", vibe: "Chill", tags: ["Basketball", "Music", "Memes"], bio: "Here for the random conversations.", gradient: "linear-gradient(145deg,#9ad6bd,#2d4c45)" }
 ];
 
 
 const ICON_BASE = "https://api.iconify.design/lucide:";
 function Icon({ name, size = 18, alt = "" }) {
-  return <img className="ui-icon" src={`${ICON_BASE}${name}.png?color=%23c8ff52&width=${size}&height=${size}`} width={size} height={size} alt={alt} aria-hidden={!alt} />;
+  const png = `${ICON_BASE}${name}.png?color=%23b7b9b1&width=${size}&height=${size}`;
+  const svg = `${ICON_BASE}${name}.svg?color=%23b7b9b1&width=${size}&height=${size}`;
+  return <img className="ui-icon" src={png} onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = svg; }} width={size} height={size} alt={alt} aria-hidden={!alt} />;
 }
 
 const PAGE_ORDER = ["home","random","discover","connections","messages","rooms","games"];
@@ -48,6 +50,7 @@ function App() {
   const [accountError, setAccountError] = useState("");
   const [paymentBusy, setPaymentBusy] = useState(false);
   const [paymentError, setPaymentError] = useState("");
+  const [showReport, setShowReport] = useState(false);
   const person = discoverPeople[discoverIndex % discoverPeople.length];
 
   function navigateTo(nextPage) {
@@ -200,7 +203,7 @@ function App() {
       <main className="main">
         <header className="topbar">
           <div className="mobile-brand">ELSEWHR</div>
-          <div className="online-pill"><span className="status-dot" /> 8,491 elsewhere right now</div>
+          <div className="online-pill"><span className="status-dot" /> People are elsewhere right now</div>
           <div className="top-actions">
             <button onClick={() => setShowPlus(true)}><Icon name="sparkles" size={14} /> Get Plus</button>
             <button className="avatar-button" onClick={() => setShowProfile(true)}>T</button>
@@ -253,7 +256,6 @@ function App() {
                       <div className="bubble">{m.text}<small>{m.time}</small></div>
                     </div>
                   ))}
-                  <div className="typing"><span /><span /><span /> {person.name}_482 is typing...</div>
                 </div>
               </div>
 
@@ -268,8 +270,8 @@ function App() {
               <div className="chat-actions">
                 <button className="next-button" onClick={nextPerson}><Icon name="refresh-cw" size={15} /> NEXT</button>
                 <button className={liked ? "liked" : ""} onClick={() => setLiked(v => !v)}><Icon name="heart" size={15} /> {liked ? "SAVED" : "SAVE"}</button>
-                <button><Icon name="flag" size={15} /> REPORT</button>
-                <button><Icon name="log-out" size={15} /> LEAVE</button>
+                <button onClick={() => setShowReport(true)}><Icon name="flag" size={15} /> REPORT</button>
+                <button onClick={() => navigateTo("home")}><Icon name="log-out" size={15} /> LEAVE</button>
               </div>
             </section>
           )}
@@ -283,7 +285,7 @@ function App() {
               <div className="discover-layout">
                 <div className="profile-card">
                   <div className="profile-photo" style={{background: person.gradient}}>
-                    <div className="verified-placeholder"><Icon name="badge-check" size={17} /></div>
+                    {person.verified && <div className="verified-placeholder"><Icon name="badge-check" size={17} /></div>}
                     <div className="photo-caption">{person.name}</div>
                   </div>
                   <div className="profile-info">
@@ -344,6 +346,21 @@ function App() {
           )}
         </div>
       </main>
+
+        <nav className="mobile-nav" aria-label="Mobile navigation">
+          {[
+            ["home", "house", "Home"],
+            ["random", "zap", "Random"],
+            ["discover", "compass", "Discover"],
+            ["messages", "message-circle", "Messages"],
+            ["profile", "user-circle-2", "Profile"]
+          ].map(([key, icon, label]) => (
+            <button key={key} className={page === key ? "active" : ""} onClick={() => key === "profile" ? setShowProfile(true) : navigateTo(key)}>
+              <Icon name={icon} size={17} />
+              <span>{label}</span>
+            </button>
+          ))}
+        </nav>
 
       {showProfile && (
         <div className="modal-backdrop" onMouseDown={() => setShowProfile(false)}>
@@ -412,6 +429,22 @@ function App() {
             <h2>A different kind of connection is coming.</h2>
             <p className="modal-copy">A future private space for deeper connections. For now, Genesis stays intentionally quiet.</p>
             <button className="primary full" onClick={() => setShowGenesis(false)}><Icon name="arrow-left" size={15} /> BACK TO ELSEWHR</button>
+          </div>
+        </div>
+      )}
+
+
+      {showReport && (
+        <div className="modal-backdrop" onMouseDown={() => setShowReport(false)}>
+          <div className="modal report-modal" onMouseDown={e => e.stopPropagation()}>
+            <div className="modal-top"><span className="eyebrow">SAFETY</span><button onClick={() => setShowReport(false)} aria-label="Close"><Icon name="x" size={16} /></button></div>
+            <h2>Report this person.</h2>
+            <p className="modal-copy">Tell us what happened. Reporting is always free.</p>
+            <div className="report-options">
+              {["Sexual or explicit content","Scam or money request","Harassment","Fake identity","Threat or danger","Underage concern","Something else"].map(reason => (
+                <button key={reason} onClick={() => setShowReport(false)}><span>{reason}</span><Icon name="chevron-right" size={15} /></button>
+              ))}
+            </div>
           </div>
         </div>
       )}
