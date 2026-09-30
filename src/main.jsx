@@ -86,6 +86,7 @@ function App() {
     }
     const nextProfile = await getProfile(user.id).catch(() => null);
     setProfile(nextProfile);
+    setProfilePreview(nextProfile?.primary_photo_url ?? "");
     return nextProfile;
   }
 
@@ -507,9 +508,9 @@ function App() {
                   }} hidden /></label>
                 </div>
                 <div className="profile-form-grid">
-                  <label>Username<input id="profile-username" placeholder="your_username" defaultValue={profile?.username ?? ""} /></label>
+                  <label>Username<input id="profile-username" required minLength={3} maxLength={24} placeholder="your_username" defaultValue={profile?.username ?? ""} /></label>
                   <label>Display name<input id="profile-display-name" placeholder="Your name" defaultValue={profile?.display_name ?? ""} /></label>
-                  <label>Age<input id="profile-age" type="number" min="18" placeholder="18+" defaultValue={profile?.age ?? ""} /></label>
+                  <label>Age<input id="profile-age" required type="number" min="18" max="120" placeholder="18+" defaultValue={profile?.age ?? ""} /></label>
                   <label>Country<input id="profile-country" placeholder="Botswana" defaultValue={profile?.country ?? ""} /></label>
                   <label>Language<input defaultValue="English" /></label>
                 </div>
@@ -534,7 +535,7 @@ function App() {
             <p className="modal-copy">More control over who you meet, how you appear, and how you stay connected.</p>
             <div className="plan-toggle">
               <button className={plusPlan === "monthly" ? "selected" : ""} onClick={() => setPlusPlan("monthly")}><strong>$1.99</strong><span>monthly</span></button>
-              <button className={plusPlan === "yearly" ? "selected" : ""} onClick={() => setPlusPlan("yearly")}><strong>$19.99</strong><span>yearly</span></button>
+              <button className={plusPlan === "yearly" ? "selected" : ""} onClick={() => setPlusPlan("yearly")}><strong>$19.99</strong><span>yearly · save 16%</span></button>
             </div>
             <div className="plus-grid">
               {["Identity verification","Advanced Discover filters","Unlimited Discover","Who liked you","Persistent images","HD video calls","Custom profiles","Premium themes","Saved conversations","Private rooms","Advanced stats","Ad-free"].map(item => <div key={item}><Icon name="check" size={13} /> {item}</div>)}
