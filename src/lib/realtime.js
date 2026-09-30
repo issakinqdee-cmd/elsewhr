@@ -45,7 +45,7 @@ export async function listConnections(currentUserId) {
   const { data, error } = await client
     .from("connections")
     .select("id, requester_id, receiver_id, status, created_at, updated_at")
-    .or(\`requester_id.eq.\${currentUserId},receiver_id.eq.\${currentUserId}\`)
+    .or(`requester_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`)
     .order("updated_at", { ascending: false });
   if (error) throw error;
 
@@ -78,7 +78,7 @@ export async function listRooms(currentUserId) {
 
   const ownRoomIds = (memberships ?? []).map(row => row.room_id);
   const query = ownRoomIds.length
-    ? client.from("rooms").select("id, kind, status, created_by, created_at, ended_at, title, description").or(\`status.eq.active,id.in.(\${ownRoomIds.join(",")})\`).order("created_at", { ascending: false }).limit(100)
+    ? client.from("rooms").select("id, kind, status, created_by, created_at, ended_at, title, description").or(`status.eq.active,id.in.(${ownRoomIds.join(",")})`).order("created_at", { ascending: false }).limit(100)
     : client.from("rooms").select("id, kind, status, created_by, created_at, ended_at, title, description").eq("kind", "group").eq("status", "active").order("created_at", { ascending: false }).limit(100);
 
   const { data: rooms, error } = await query;
