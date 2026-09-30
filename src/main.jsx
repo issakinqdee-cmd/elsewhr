@@ -49,8 +49,9 @@ function Icon({ name, size = 18, alt = "" }) {
 function BrandMark({ size = 28 }) {
   return (
     <span className="brand-mark" style={{ width: size, height: size }}>
-      <svg viewBox="0 0 28 28" width={Math.round(size * 0.58)} height={Math.round(size * 0.58)} viewBox="0 0 28 28" aria-hidden="true">
-        <path fill="currentColor" d="M4 4h19l-5 5H10v3h10l-5 4H10v3h13l-5 5H4z" />
+      <svg viewBox="0 0 32 32" width={Math.round(size * 0.72)} height={Math.round(size * 0.72)} aria-hidden="true">
+        <text x="14.5" y="24.5" textAnchor="middle" fontFamily="Allura, cursive" fontSize="28" fill="currentColor">E</text>
+        <path d="M18.5 23.5 C21.8 27.4 26.4 26.3 28 22.2" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
       </svg>
     </span>
   );
