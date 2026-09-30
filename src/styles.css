@@ -150,3 +150,28 @@ button{border:0;cursor:pointer}
 .primary:hover,.secondary:hover,.round-button:hover{transform:translateY(-2px)}
 .connection-card:hover,.coming-grid>div:hover,.filter-card:hover,.quote-card:hover,.profile-card:hover{transform:translateY(-3px);box-shadow:0 18px 45px rgba(0,0,0,.18)}
 @media (prefers-reduced-motion:reduce){.page-transition,.page-transition::after{animation:none!important}.nav-item,.primary,.secondary,.round-button,.chat-actions button,.connection-card,.profile-card,.filter-card,.quote-card,.coming-grid>div{transition:none!important}.nav-item:hover,.primary:hover,.secondary:hover,.round-button:hover,.connection-card:hover,.coming-grid>div:hover,.filter-card:hover,.quote-card:hover,.profile-card:hover{transform:none}}
+
+
+/* Production polish: icon contrast, mobile navigation, safety modal */
+.ui-icon{filter:none!important}
+.primary .ui-icon,.round-button.connect .ui-icon,.composer .send .ui-icon{filter:brightness(0)!important}
+.top-actions>button:first-child .ui-icon,.paypal-button .ui-icon,.plus-badge .ui-icon{filter:brightness(0)!important}
+.mobile-nav{display:none}
+.report-modal{width:min(520px,100%)}
+.report-options{display:grid;gap:7px;margin-top:18px}
+.report-options button{display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;padding:13px 14px;background:#141414;border:1px solid rgba(255,255,255,.08);border-radius:12px;color:#dedfd8;text-align:left;font-size:12px}
+.report-options button:hover{background:#191919;border-color:rgba(200,255,82,.18);color:#fff}
+.report-options button .ui-icon{filter:none!important}
+@media(max-width:900px){
+  body{padding-bottom:72px}
+  .mobile-nav{position:fixed;display:grid;grid-template-columns:repeat(5,1fr);left:10px;right:10px;bottom:10px;height:60px;background:rgba(15,15,15,.94);border:1px solid rgba(255,255,255,.1);border-radius:18px;backdrop-filter:blur(20px);z-index:45;box-shadow:0 18px 50px rgba(0,0,0,.45)}
+  .mobile-nav button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:transparent;color:#77786f;font-size:8px;letter-spacing:.02em}
+  .mobile-nav button.active{color:#c8ff52}
+  .mobile-nav .ui-icon{width:17px;height:17px}
+  .mobile-nav button.active .ui-icon{filter:none!important}
+}
+@media(max-width:620px){
+  .chat-header-actions button{padding:8px 10px}
+  .chat-header-actions button:nth-child(1),.chat-header-actions button:nth-child(2){display:inline-flex}
+  .chat-header-actions button:nth-child(3){display:inline-flex;padding:8px}
+}
