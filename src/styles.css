@@ -907,3 +907,387 @@ body{
 @media(max-width:620px){
   :root[data-theme="light"] .top-actions .plus-open-button{display:none}
 }
+
+/* Kinetic chat games */
+.chat-play-button{
+  color:#f2d9ff!important;
+  border-color:rgba(255,95,122,.2)!important;
+  background:linear-gradient(135deg,rgba(255,95,122,.12),rgba(139,92,246,.14))!important;
+  position:relative;
+  overflow:hidden;
+}
+.chat-play-button:before{
+  content:"";
+  position:absolute;
+  inset:-30%;
+  background:linear-gradient(100deg,transparent 35%,rgba(255,255,255,.16) 50%,transparent 65%);
+  transform:translateX(-100%) skewX(-18deg);
+  animation:playButtonSheen 2.8s ease-in-out infinite;
+}
+.chat-play-button>*{position:relative;z-index:1}
+@keyframes playButtonSheen{
+  0%,58%{transform:translateX(-110%) skewX(-18deg)}
+  78%,100%{transform:translateX(110%) skewX(-18deg)}
+}
+.together-overlay{
+  position:fixed;
+  inset:0;
+  z-index:70;
+  display:grid;
+  place-items:center;
+  padding:22px;
+  background:rgba(4,5,12,.72);
+  backdrop-filter:blur(18px);
+  overflow:auto;
+}
+.together-picker,
+.together-arena{
+  width:min(920px,100%);
+  position:relative;
+  overflow:hidden;
+  border:1px solid rgba(255,255,255,.11);
+  border-radius:28px;
+  background:linear-gradient(145deg,#0c0e18,#11101a 55%,#0d0d15);
+  box-shadow:0 35px 120px rgba(0,0,0,.55);
+}
+.together-picker{
+  padding:28px;
+  animation:togetherIn .5s cubic-bezier(.2,.85,.2,1) both;
+}
+.together-arena{
+  width:min(650px,100%);
+  padding:24px;
+  animation:arenaIn .55s cubic-bezier(.16,.84,.23,1) both;
+}
+@keyframes togetherIn{
+  0%{opacity:0;transform:translateY(34px) scale(.96) rotateX(5deg)}
+  55%{opacity:1}
+  100%{opacity:1;transform:translateY(0) scale(1) rotateX(0)}
+}
+@keyframes arenaIn{
+  0%{opacity:0;transform:scale(.76) rotate(-2deg)}
+  70%{opacity:1;transform:scale(1.025) rotate(.25deg)}
+  100%{opacity:1;transform:scale(1) rotate(0)}
+}
+.together-picker-glow{
+  position:absolute;
+  width:290px;
+  height:290px;
+  border-radius:50%;
+  filter:blur(18px);
+  pointer-events:none;
+  opacity:.5;
+  animation:gameGlow 5.5s ease-in-out infinite alternate;
+}
+.glow-one{left:-130px;top:-130px;background:rgba(139,92,246,.23)}
+.glow-two{right:-140px;bottom:-160px;background:rgba(255,95,122,.18);animation-delay:-2s}
+@keyframes gameGlow{
+  from{transform:translate3d(-8px,4px,0) scale(.9)}
+  to{transform:translate3d(20px,-14px,0) scale(1.12)}
+}
+.together-picker-top,
+.together-arena-top{
+  position:relative;
+  z-index:1;
+  display:flex;
+  justify-content:space-between;
+  gap:18px;
+  align-items:flex-start;
+}
+.together-picker-top h3{
+  font:700 clamp(34px,5vw,52px)/.95 "Space Grotesk",sans-serif;
+  letter-spacing:-.055em;
+  margin:8px 0 10px;
+}
+.together-picker-top p{margin:0;color:#858691;font-size:12px;line-height:1.55;max-width:520px}
+.together-close{
+  width:36px!important;
+  height:36px!important;
+  border-radius:50%!important;
+  background:rgba(255,255,255,.055)!important;
+  color:#8f909d!important;
+  border:1px solid rgba(255,255,255,.08)!important;
+  display:grid!important;
+  place-items:center!important;
+  flex:none;
+}
+.together-close:hover{color:#fff!important;background:rgba(255,255,255,.1)!important;transform:rotate(6deg)}
+.together-game-grid{
+  position:relative;
+  z-index:1;
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:10px;
+  margin-top:24px;
+}
+.together-game-card{
+  min-height:130px;
+  position:relative;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  text-align:left;
+  gap:12px;
+  padding:15px;
+  border-radius:18px;
+  background:rgba(255,255,255,.035);
+  border:1px solid rgba(255,255,255,.075);
+  color:#fff;
+  animation:togetherCardIn .5s cubic-bezier(.2,.85,.2,1) both;
+  animation-delay:var(--delay);
+  transition:transform .2s ease,border-color .2s ease,background .2s ease,box-shadow .2s ease;
+}
+@keyframes togetherCardIn{
+  from{opacity:0;transform:translateY(18px) scale(.96)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+.together-game-card:after{
+  content:"";
+  position:absolute;
+  inset:0;
+  border-radius:inherit;
+  background:linear-gradient(120deg,transparent,rgba(255,255,255,.07),transparent);
+  transform:translateX(-120%);
+  transition:transform .65s ease;
+  pointer-events:none;
+}
+.together-game-card:hover{
+  transform:translateY(-5px) scale(1.018);
+  border-color:rgba(139,92,246,.3);
+  background:rgba(139,92,246,.075);
+  box-shadow:0 22px 55px rgba(0,0,0,.25);
+}
+.together-game-card:hover:after{transform:translateX(120%)}
+.together-game-card.premium{opacity:.72}
+.together-card-icon{
+  width:42px;height:42px;border-radius:13px;
+  display:grid;place-items:center;
+  background:linear-gradient(145deg,rgba(139,92,246,.13),rgba(255,95,122,.08));
+  border:1px solid rgba(139,92,246,.17);
+  color:#dfccff;
+}
+.together-card-copy{display:grid;gap:5px;position:relative;z-index:1}
+.together-card-copy strong{font-size:14px;font-family:"Space Grotesk",sans-serif}
+.together-card-copy small{font-size:9px;line-height:1.4;color:#7e808c}
+.together-card-badge{
+  position:absolute;right:11px;top:11px;
+  font-size:7px;letter-spacing:.11em;font-weight:800;
+  color:#9beff5;
+}
+.together-game-card.premium .together-card-badge{color:#ff9fb4}
+.together-picker-footer{
+  position:relative;
+  z-index:1;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:15px;
+  margin-top:18px;
+  padding-top:15px;
+  border-top:1px solid rgba(255,255,255,.07);
+  color:#777984;
+  font-size:9px;
+}
+.together-picker-footer span{display:flex;align-items:center;gap:6px}
+.together-picker-footer button{
+  background:none;color:#cbb9ff;font-size:9px;font-weight:800;letter-spacing:.06em;
+}
+.game-invite-pop{
+  position:relative;
+  z-index:8;
+  margin:12px 18px 0;
+  display:flex;
+  align-items:center;
+  gap:11px;
+  padding:11px 13px;
+  border:1px solid rgba(255,95,122,.18);
+  background:linear-gradient(100deg,rgba(255,95,122,.08),rgba(139,92,246,.09));
+  border-radius:16px;
+  animation:inviteIn .42s cubic-bezier(.2,.85,.2,1) both;
+}
+@keyframes inviteIn{
+  from{opacity:0;transform:translateY(-14px) scale(.98)}
+  to{opacity:1;transform:translateY(0) scale(1)}
+}
+.game-invite-orb{
+  width:38px;height:38px;border-radius:13px;display:grid;place-items:center;
+  background:linear-gradient(145deg,#ff5f7a,#8b5cf6);
+  color:#fff;flex:none;
+  box-shadow:0 0 30px rgba(255,95,122,.2);
+  animation:invitePulse 1.7s ease-in-out infinite;
+}
+@keyframes invitePulse{50%{transform:scale(1.08);box-shadow:0 0 42px rgba(139,92,246,.3)}}
+.game-invite-copy{min-width:0;display:grid;gap:3px;flex:1}
+.game-invite-copy span{font-size:7px;letter-spacing:.16em;color:#a6a8b2}
+.game-invite-copy strong{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.game-invite-actions{display:flex;gap:6px}
+.game-invite-actions button{padding:8px 10px!important;border-radius:10px!important;font-size:8px!important}
+.game-layer{background:rgba(4,5,12,.82)}
+.together-arena:before{
+  content:"";
+  position:absolute;
+  width:240px;height:240px;border-radius:50%;
+  left:-100px;top:-110px;
+  background:rgba(139,92,246,.15);
+  filter:blur(15px);
+  animation:arenaOrb 4s ease-in-out infinite alternate;
+}
+.together-arena:after{
+  content:"";
+  position:absolute;
+  width:210px;height:210px;border-radius:50%;
+  right:-90px;bottom:-110px;
+  background:rgba(255,95,122,.12);
+  filter:blur(15px);
+  animation:arenaOrb 4.5s ease-in-out infinite alternate-reverse;
+}
+@keyframes arenaOrb{to{transform:translate(30px,-25px) scale(1.2)}}
+.together-arena-top{align-items:center}
+.versus-line{display:flex;align-items:center;gap:10px;position:relative;z-index:1}
+.versus-avatar{
+  width:34px;height:34px;border-radius:11px;
+  display:grid;place-items:center;
+  font:700 12px "Space Grotesk",sans-serif;
+  border:1px solid rgba(255,255,255,.12);
+}
+.versus-avatar.mine{background:rgba(139,92,246,.18);color:#ddd0ff}
+.versus-avatar.them{background:rgba(255,95,122,.14);color:#ffc4cf}
+.versus-title{font:700 13px "Space Grotesk",sans-serif;letter-spacing:.02em}
+.versus-pulse{width:5px;height:5px;border-radius:50%;background:#22d3ee;box-shadow:0 0 14px #22d3ee;animation:versusPulse 1s infinite alternate}
+@keyframes versusPulse{to{transform:scale(1.8);opacity:.45}}
+.together-play-stage{
+  position:relative;
+  z-index:1;
+  display:grid;
+  justify-items:center;
+  gap:16px;
+  padding:28px 10px 8px;
+}
+.together-status{
+  min-height:18px;
+  text-align:center;
+  color:#ddd6fe;
+  font:800 11px "Space Grotesk",sans-serif;
+  letter-spacing:.14em;
+}
+.duel-board{
+  width:min(360px,100%);
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:8px;
+  padding:10px;
+  border-radius:24px;
+  background:rgba(255,255,255,.035);
+  border:1px solid rgba(255,255,255,.06);
+  box-shadow:inset 0 0 50px rgba(139,92,246,.04);
+}
+.duel-cell{
+  aspect-ratio:1;
+  border-radius:16px;
+  background:rgba(255,255,255,.035);
+  border:1px solid rgba(255,255,255,.07);
+  color:#fff;
+  font:700 42px "Space Grotesk",sans-serif;
+  transition:transform .18s ease,background .18s ease,box-shadow .18s ease;
+}
+.duel-cell:hover{transform:translateY(-3px);background:rgba(139,92,246,.08)}
+.duel-cell.x{color:#cdbdff;text-shadow:0 0 24px rgba(139,92,246,.55)}
+.duel-cell.o{color:#ff9eb4;text-shadow:0 0 24px rgba(255,95,122,.45)}
+.together-play-stage>small{color:#777984;font-size:9px}
+.rps-kinetic{display:flex;justify-content:center;gap:12px}
+.rps-kinetic button{
+  width:96px;height:118px;border-radius:20px;
+  background:rgba(255,255,255,.035);
+  color:#fff;border:1px solid rgba(255,255,255,.08);
+  display:grid;place-items:center;align-content:center;gap:8px;
+  transition:transform .2s ease,background .2s ease,border-color .2s ease;
+}
+.rps-kinetic button span{font-size:34px;filter:drop-shadow(0 0 18px rgba(139,92,246,.18))}
+.rps-kinetic button small{text-transform:uppercase;letter-spacing:.1em;font-size:7px;color:#888994}
+.rps-kinetic button:hover:not(:disabled){transform:translateY(-8px) rotate(-1deg);background:rgba(139,92,246,.08);border-color:rgba(139,92,246,.3)}
+.rps-kinetic button.chosen{transform:translateY(-10px) scale(1.04);background:linear-gradient(145deg,rgba(139,92,246,.15),rgba(255,95,122,.1));border-color:rgba(139,92,246,.34)}
+.rps-kinetic button:disabled{cursor:default}
+.duel-reaction-target{
+  width:min(390px,100%);
+  aspect-ratio:2/1;
+  border-radius:26px;
+  background:rgba(255,255,255,.035);
+  color:#666975;
+  border:1px solid rgba(255,255,255,.08);
+  font:800 28px "Space Grotesk",sans-serif;
+  letter-spacing:.08em;
+}
+.duel-reaction-target.live{
+  background:radial-gradient(circle at 50% 42%,#b9faff 0%,#22d3ee 45%,#0b7286 100%);
+  color:#061117;
+  border-color:transparent;
+  box-shadow:0 0 75px rgba(34,211,238,.35);
+  animation:reactionFlash .6s ease-in-out infinite alternate;
+}
+@keyframes reactionFlash{to{transform:scale(1.025);box-shadow:0 0 105px rgba(34,211,238,.52)}}
+.reaction-score-row{
+  width:min(390px,100%);
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+}
+.reaction-score-row span{
+  display:grid;gap:4px;padding:11px 12px;border-radius:13px;
+  background:rgba(255,255,255,.03);
+  border:1px solid rgba(255,255,255,.06);
+  color:#777984;font-size:8px;letter-spacing:.08em;text-transform:uppercase;
+}
+.reaction-score-row strong{font:700 16px "Space Grotesk",sans-serif;color:#fff;text-transform:none;letter-spacing:-.02em}
+@media(max-width:950px){.together-game-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:680px){
+  .together-overlay{padding:10px}
+  .together-picker,.together-arena{border-radius:22px;padding:18px}
+  .together-game-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .together-game-card{min-height:118px;padding:12px}
+  .game-invite-pop{margin:8px 10px 0;align-items:flex-start;flex-wrap:wrap}
+  .game-invite-copy{min-width:calc(100% - 55px);max-width:calc(100% - 55px)}
+  .game-invite-actions{width:100%;margin-left:49px}
+  .game-invite-actions button{flex:1}
+  .rps-kinetic{gap:7px}
+  .rps-kinetic button{width:84px;height:104px}
+}
+@media(max-width:430px){
+  .together-game-grid{grid-template-columns:1fr}
+  .together-game-card{min-height:88px;flex-direction:row;align-items:center}
+  .together-card-icon{flex:none}
+  .together-card-copy{flex:1}
+  .rps-kinetic button{width:30vw;max-width:95px}
+}
+:root[data-theme="light"] .together-overlay{background:rgba(20,22,35,.4)}
+:root[data-theme="light"] .together-picker,
+:root[data-theme="light"] .together-arena{
+  background:linear-gradient(145deg,#fff,#f8f8fc 58%,#fff3f8);
+  border-color:rgba(23,24,38,.1);
+  box-shadow:0 35px 120px rgba(36,40,70,.18);
+}
+:root[data-theme="light"] .together-picker-top h3,
+:root[data-theme="light"] .versus-title{color:#171826}
+:root[data-theme="light"] .together-picker-top p,
+:root[data-theme="light"] .together-card-copy small,
+:root[data-theme="light"] .together-picker-footer,
+:root[data-theme="light"] .together-play-stage>small{color:#747687}
+:root[data-theme="light"] .together-game-card{
+  background:rgba(23,24,38,.028);
+  border-color:rgba(23,24,38,.08);
+  color:#171826;
+}
+:root[data-theme="light"] .together-game-card:hover{background:rgba(139,92,246,.06);border-color:rgba(139,92,246,.24);box-shadow:0 22px 55px rgba(36,40,70,.1)}
+:root[data-theme="light"] .together-card-icon{background:linear-gradient(145deg,rgba(139,92,246,.1),rgba(255,95,122,.07));border-color:rgba(139,92,246,.14);color:#6751ad}
+:root[data-theme="light"] .together-close{background:#f0f1f7!important;color:#686978!important;border-color:rgba(23,24,38,.08)!important}
+:root[data-theme="light"] .game-invite-pop{background:linear-gradient(100deg,rgba(255,95,122,.07),rgba(139,92,246,.07));border-color:rgba(255,95,122,.16)}
+:root[data-theme="light"] .together-status{color:#634ab0}
+:root[data-theme="light"] .duel-board,
+:root[data-theme="light"] .reaction-score-row span{background:rgba(23,24,38,.025);border-color:rgba(23,24,38,.07)}
+:root[data-theme="light"] .duel-cell,
+:root[data-theme="light"] .rps-kinetic button{
+  background:#f1f2f7;
+  color:#171826;
+  border-color:rgba(23,24,38,.08);
+}
+:root[data-theme="light"] .rps-kinetic button small{color:#777887}
+:root[data-theme="light"] .reaction-score-row strong{color:#171826}
