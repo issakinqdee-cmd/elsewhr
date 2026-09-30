@@ -604,23 +604,32 @@ function App() {
   }
 
   async function handleJoinRoom(room) {
+    if (!authUser || !room?.id) return;
+    setDataBusy(true);
+    setDataError("");
     try {
       await joinRoom(room.id, authUser.id);
       await refreshAll();
-      setToast("Joined room. Open it here when you're ready.");
+      await openRoom(room.id);
+      navigateTo("rooms");
+      setToast("You're in. Welcome to the room.");
     } catch (error) {
-      setDataError(error.message || "Room could not be joined.");
+      setDataError(error.message || "Room could not be entered.");
+    } finally {
+      setDataBusy(false);
     }
   }
 
   async function handleLeaveRoom() {
     if (!activeRoom || !authUser) return;
+    const leavingKind = activeRoom.kind;
     try {
       await leaveRoom(activeRoom.id, authUser.id);
       setCurrentRoom(null);
       setActiveMessages([]);
       await refreshAll();
-      if (page !== "messages" && page !== "random") navigateTo("home");
+      if (leavingKind === "group") navigateTo("rooms");
+      else if (page !== "messages" && page !== "random") navigateTo("home");
       setToast("You left the room.");
     } catch (error) {
       setDataError(error.message || "Could not leave this room.");
@@ -1204,41 +1213,94 @@ function App() {
             )}
 
             {page === "rooms" && (
-              <section className="simple-page">
-                <div className="section-heading">
-                  <div><span className="eyebrow">ROOMS</span><h2>Live public rooms.</h2></div>
+              activeRoom?.kind === "group" ? (
+                <div className="room-chat-surface">
+                  <button
+                    className="conversation-mobile-back room-back-button"
+                    type="button"
+                    onClick={() => { setCurrentRoom(null); setActiveMessages([]); }}
+                  >
+                    <Icon name="arrow-left" size={14} /> All rooms
+                  </button>
+                  <LiveChat
+                    activeRoom={activeRoom}
+                    activeOther={activeOther}
+                    activeConnection={activeConnection}
+                    activeMessages={activeMessages}
+                    authUser={authUser}
+                    message={message}
+                    setMessage={setMessage}
+                    editingMessageId={editingMessageId}
+                    replyToMessage={replyToMessage}
+                    openMessageActionsId={openMessageActionsId}
+                    openReactionId={openReactionId}
+                    onConnect={handleConnect}
+                    onSend={handleSendMessage}
+                    onStartReply={startReply}
+                    onStartEdit={startEdit}
+                    onCancelEdit={cancelMessageEdit}
+                    onDeleteForMe={handleDeleteForMe}
+                    onDeleteForEveryone={handleDeleteForEveryone}
+                    onReact={handleMessageReaction}
+                    onCopy={handleCopyMessage}
+                    onToggleMessageActions={id => {
+                      setOpenMessageActionsId(current => current === id ? null : id);
+                      setOpenReactionId(null);
+                    }}
+                    onToggleReactionPicker={id => {
+                      setOpenReactionId(current => current === id ? null : id);
+                      setOpenMessageActionsId(null);
+                    }}
+                    onReport={() => setShowReport(true)}
+                    onMenu={() => setShowChatMenu(value => !value)}
+                    onLeave={handleLeaveRoom}
+                  />
                 </div>
-                <form className="room-create-card" onSubmit={handleCreateRoom}>
-                  <div>
-                    <strong>Create a public room</strong>
-                    <span>Give people a real place to talk.</span>
+              ) : (
+                <section className="simple-page">
+                  <div className="section-heading">
+                    <div><span className="eyebrow">ROOMS</span><h2>Live public rooms.</h2></div>
                   </div>
-                  <input value={roomTitle} onChange={e => setRoomTitle(e.target.value)} required maxLength={80} placeholder="Room name" />
-                  <input value={roomDescription} onChange={e => setRoomDescription(e.target.value)} maxLength={180} placeholder="What is this room about?" />
-                  <button className="primary" disabled={roomBusy}>{roomBusy ? "CREATING..." : "CREATE ROOM"}</button>
-                </form>
-                {groupRooms.length ? (
-                  <div className="room-grid">
-                    {groupRooms.map(room => {
-                      const joined = room.members?.some(member => member.user_id === authUser.id && !member.left_at);
-                      return (
-                        <article className="room-card" key={room.id}>
-                          <div className="room-card-top"><span className="eyebrow">PUBLIC ROOM</span><span>{joined ? (room.members?.length || 1) + " live" : "OPEN"}</span></div>
-                          <h3>{room.title || "Untitled room"}</h3>
-                          <p>{room.description || "No description."}</p>
-                          <button className="secondary" onClick={() => joined ? openRoom(room.id) : handleJoinRoom(room)}>{joined ? "OPEN ROOM" : "JOIN ROOM"}</button>
-                        </article>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="empty-state">
-                    <div className="empty-icon"><Icon name="panels-top-left" size={23} /></div>
-                    <span className="eyebrow">ROOMS</span>
-                    <h2>No public rooms yet.</h2>
-                    <p>Create the first live room for the community.</p>
-                  </div>
-                )}
+                  <form className="room-create-card" onSubmit={handleCreateRoom}>
+                    <div>
+                      <strong>Create a public room</strong>
+                      <span>Give people a real place to talk.</span>
+                    </div>
+                    <input value={roomTitle} onChange={e => setRoomTitle(e.target.value)} required maxLength={80} placeholder="Room name" />
+                    <input value={roomDescription} onChange={e => setRoomDescription(e.target.value)} maxLength={180} placeholder="What is this room about?" />
+                    <button className="primary" disabled={roomBusy}>{roomBusy ? "CREATING..." : "CREATE ROOM"}</button>
+                  </form>
+                  {groupRooms.length ? (
+                    <div className="room-grid">
+                      {groupRooms.map(room => {
+                        const joined = room.members?.some(member => member.user_id === authUser.id && !member.left_at);
+                        return (
+                          <article className="room-card" key={room.id}>
+                            <div className="room-card-top"><span className="eyebrow">PUBLIC ROOM</span><span>{joined ? (room.members?.length || 1) + " live" : "OPEN"}</span></div>
+                            <h3>{room.title || "Untitled room"}</h3>
+                            <p>{room.description || "No description."}</p>
+                            <button
+                              className="secondary"
+                              disabled={dataBusy}
+                              onClick={() => joined ? openRoom(room.id) : handleJoinRoom(room)}
+                            >
+                              {joined ? "ENTER ROOM" : "ENTER ROOM"}
+                            </button>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="empty-state">
+                      <div className="empty-icon"><Icon name="panels-top-left" size={23} /></div>
+                      <span className="eyebrow">ROOMS</span>
+                      <h2>No public rooms yet.</h2>
+                      <p>Create the first live room for the community.</p>
+                    </div>
+                  )}
+                </section>
+              )
+            )}
               </section>
             )}
           </div>
