@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 import { supabase, supabaseConfigured } from "./lib/supabase";
-import { getCurrentUser, saveProfile, signInWithEmail, signOut, signUpWithEmail, uploadAvatar } from "./lib/account";
+import { getCurrentUser, getProfile, saveProfile, signInWithEmail, signOut, signUpWithEmail, uploadAvatar } from "./lib/account";
 import { startPaypalSubscription } from "./lib/paypal";
 
 const discoverPeople = [
@@ -51,9 +51,25 @@ function App() {
   const [paymentBusy, setPaymentBusy] = useState(false);
   const [paymentError, setPaymentError] = useState("");
   const [showReport, setShowReport] = useState(false);
+  const [showComposerTool, setShowComposerTool] = useState("");
+  const [showChatMenu, setShowChatMenu] = useState(false);
+  const [plusPlan, setPlusPlan] = useState("monthly");
+  const [toast, setToast] = useState("");
+  const [profile, setProfile] = useState(null);
+  const [profilePreview, setProfilePreview] = useState("");
   const [isMatching, setIsMatching] = useState(false);
   const [matchSeconds, setMatchSeconds] = useState(0);
   const person = discoverPeople[discoverIndex % discoverPeople.length];
+  const profileReady = Boolean(authUser && profile?.primary_photo_path && profile?.age >= 18 && profile?.username);
+
+  function goSocial(nextPage) {
+    if (!authUser || !profileReady) {
+      setShowProfile(true);
+      setToast("Create your profile and add a primary photo first.");
+      return;
+    }
+    navigateTo(nextPage);
+  }
 
   function navigateTo(nextPage) {
     if (nextPage === page) return;
@@ -63,14 +79,39 @@ function App() {
     setPage(nextPage);
   }
 
+  async function refreshProfile(user = authUser) {
+    if (!user || !supabase) {
+      setProfile(null);
+      return null;
+    }
+    const nextProfile = await getProfile(user.id).catch(() => null);
+    setProfile(nextProfile);
+    return nextProfile;
+  }
+
   useEffect(() => {
     if (!supabase) return;
-    getCurrentUser().then(setAuthUser).catch(() => setAuthUser(null));
+    getCurrentUser().then(async user => {
+      setAuthUser(user);
+      if (user) await refreshProfile(user);
+    }).catch(() => {
+      setAuthUser(null);
+      setProfile(null);
+    });
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-      setAuthUser(session?.user ?? null);
+      const user = session?.user ?? null;
+      setAuthUser(user);
+      if (user) refreshProfile(user);
+      else setProfile(null);
     });
     return () => data.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(""), 2400);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
 
   useEffect(() => {
     if (!isMatching) return;
@@ -117,6 +158,9 @@ function App() {
     setProfileSaving(true);
     setAccountError("");
     try {
+      if (!profileFile && !profile?.primary_photo_path) {
+        throw new Error("Add a primary profile photo before joining ELSEWHR.");
+      }
       let photo = null;
       if (profileFile) photo = await uploadAvatar(authUser.id, profileFile);
       await saveProfile({
@@ -128,11 +172,15 @@ function App() {
         languages: ["English"],
         interests: ["Music"],
         bio: document.getElementById("profile-bio")?.value || null,
-        primary_photo_path: photo?.path ?? null,
-        primary_photo_url: photo?.publicUrl ?? null,
-        discoverable: Boolean(photo),
+        primary_photo_path: photo?.path ?? profile?.primary_photo_path ?? null,
+        primary_photo_url: photo?.publicUrl ?? profile?.primary_photo_url ?? null,
+        discoverable: true,
       });
+      const saved = await getProfile(authUser.id);
+      setProfile(saved);
+      setProfilePreview(saved?.primary_photo_url ?? "");
       setShowProfile(false);
+      setToast("Profile saved. You’re ready to go ELSEWHR.");
     } catch (error) {
       setAccountError(error.message || "Could not save your profile.");
     } finally {
@@ -199,7 +247,7 @@ function App() {
     setLiked(false);
     setSent([]);
     setMessage("");
-    navigateTo("random");
+    goSocial("random");
     setIsMatching(true);
   }
 
@@ -230,7 +278,7 @@ function App() {
         <div className="side-section">
           <span className="side-label">EXPLORE</span>
           {nav.map(([key, icon, label]) => (
-            <button key={key} className={`nav-item ${page === key ? "active" : ""}`} onClick={() => navigateTo(key)}>
+            <button key={key} className={`nav-item ${page === key ? "active" : ""}`} onClick={() => key === "home" ? navigateTo("home") : goSocial(key)}>
               <span className="nav-icon"><Icon name={icon} /></span><span>{label}</span>
             </button>
           ))}
@@ -259,7 +307,7 @@ function App() {
           <div className="online-pill"><span className="status-dot" /> People are elsewhere right now</div>
           <div className="top-actions">
             <button onClick={() => setShowPlus(true)}><Icon name="sparkles" size={14} /> Get Plus</button>
-            <button className="avatar-button" onClick={() => setShowProfile(true)}>T</button>
+            <button className="avatar-button" onClick={() => setShowProfile(true)}>{(profile?.display_name || profile?.username || authEmail || "E").slice(0,1).toUpperCase()}</button>
           </div>
         </header>
 
@@ -270,8 +318,8 @@ function App() {
               <h1>Someone,<br /><span>somewhere,</span><br />is waiting.</h1>
               <p>Meet people outside your usual world. Talk, discover, connect, and decide what happens next.</p>
               <div className="hero-actions">
-                <button className="primary large" onClick={() => navigateTo("random")}>GO ELSEWHR <Icon name="arrow-up-right" size={16} /></button>
-                <button className="secondary large" onClick={() => navigateTo("discover")}>DISCOVER PEOPLE</button>
+                <button className="primary large" onClick={() => goSocial("random")}>GO ELSEWHR <Icon name="arrow-up-right" size={16} /></button>
+                <button className="secondary large" onClick={() => goSocial("discover")}>DISCOVER PEOPLE</button>
               </div>
               <div className="hero-grid">
                 <div><strong>1 → 1</strong><span>Instant private chat</span></div>
@@ -303,7 +351,7 @@ function App() {
                     <div className="chat-header-actions">
                       <button onClick={() => setShowCall("voice")}><Icon name="phone" size={14} /> Voice</button>
                       <button onClick={() => setShowCall("video")}><Icon name="video" size={14} /> Video</button>
-                      <button aria-label="More options"><Icon name="ellipsis" size={16} /></button>
+                      <button aria-label="More options" onClick={() => setShowChatMenu(v => !v)}><Icon name="ellipsis" size={16} /></button>
                     </div>
                   </div>
 
@@ -325,9 +373,9 @@ function App() {
                   </div>
 
                   <form className="composer" onSubmit={sendMessage}>
-                    <button type="button" aria-label="Emoji"><Icon name="smile" size={17} /></button>
-                    <button type="button" title="Images"><Icon name="image" size={17} /></button>
-                    <button type="button" title="Voice note"><Icon name="mic" size={17} /></button>
+                    <button type="button" aria-label="Emoji" onClick={() => setShowComposerTool("emoji")}><Icon name="smile" size={17} /></button>
+                    <button type="button" title="Images" onClick={() => setShowComposerTool("image")}><Icon name="image" size={17} /></button>
+                    <button type="button" title="Voice note" onClick={() => setShowComposerTool("voice")}><Icon name="mic" size={17} /></button>
                     <input value={message} onChange={e => setMessage(e.target.value)} placeholder="Message..." />
                     <button className="send" aria-label="Send" type="submit"><Icon name="send" size={16} /></button>
                   </form>
@@ -422,7 +470,7 @@ function App() {
             ["messages", "message-circle", "Messages"],
             ["profile", "user-circle-2", "Profile"]
           ].map(([key, icon, label]) => (
-            <button key={key} className={page === key ? "active" : ""} onClick={() => key === "profile" ? setShowProfile(true) : navigateTo(key)}>
+            <button key={key} className={page === key ? "active" : ""} onClick={() => key === "profile" ? setShowProfile(true) : goSocial(key)}>
               <Icon name={icon} size={17} />
               <span>{label}</span>
             </button>
@@ -448,18 +496,24 @@ function App() {
             {supabaseConfigured && authUser && (
               <form onSubmit={handleProfileSave}>
                 <div className="photo-upload">
-                  <div className="upload-avatar"><Icon name="image-plus" size={21} /></div>
-                  <div><strong>Add your picture</strong><span>Primary photo required for discovery</span></div>
-                  <label className="upload-button">Choose<input type="file" accept="image/png,image/jpeg,image/webp" onChange={e => setProfileFile(e.target.files?.[0] ?? null)} hidden /></label>
+                  <div className="upload-avatar photo-preview" style={profilePreview ? { backgroundImage: `url(${profilePreview})` } : undefined}>
+                    {!profilePreview && <Icon name="image-plus" size={21} />}
+                  </div>
+                  <div><strong>{profilePreview ? "Primary photo" : "Add your picture"}</strong><span>One real person · required for discovery</span></div>
+                  <label className="upload-button">Choose<input type="file" accept="image/png,image/jpeg,image/webp" onChange={e => {
+                    const file = e.target.files?.[0] ?? null;
+                    setProfileFile(file);
+                    if (file) setProfilePreview(URL.createObjectURL(file));
+                  }} hidden /></label>
                 </div>
                 <div className="profile-form-grid">
-                  <label>Username<input id="profile-username" placeholder="your_username" /></label>
-                  <label>Display name<input id="profile-display-name" placeholder="Theo" /></label>
-                  <label>Age<input id="profile-age" type="number" min="18" placeholder="18+" /></label>
-                  <label>Country<input id="profile-country" placeholder="Botswana" /></label>
+                  <label>Username<input id="profile-username" placeholder="your_username" defaultValue={profile?.username ?? ""} /></label>
+                  <label>Display name<input id="profile-display-name" placeholder="Your name" defaultValue={profile?.display_name ?? ""} /></label>
+                  <label>Age<input id="profile-age" type="number" min="18" placeholder="18+" defaultValue={profile?.age ?? ""} /></label>
+                  <label>Country<input id="profile-country" placeholder="Botswana" defaultValue={profile?.country ?? ""} /></label>
                   <label>Language<input defaultValue="English" /></label>
                 </div>
-                <label className="profile-wide">Bio<textarea id="profile-bio" rows="3" placeholder="Tell people what you're into..." /></label>
+                <label className="profile-wide">Bio<textarea id="profile-bio" rows="3" placeholder="Tell people what you're into...">{profile?.bio ?? ""}</textarea></label>
                 {accountError && <div className="form-error">{accountError}</div>}
                 <div className="verification-callout">
                   <span><Icon name="shield-check" size={18} /></span>
@@ -478,12 +532,15 @@ function App() {
             <div className="modal-top"><span className="plus-badge"><Icon name="sparkles" size={12} /> ELSEWHR+</span><button onClick={() => setShowPlus(false)} aria-label="Close"><Icon name="x" size={16} /></button></div>
             <h2>Make ELSEWHR yours.</h2>
             <p className="modal-copy">More control over who you meet, how you appear, and how you stay connected.</p>
-            <div className="price-row"><strong>$1.99</strong><span>/ month · $19.99 / year</span></div>
+            <div className="plan-toggle">
+              <button className={plusPlan === "monthly" ? "selected" : ""} onClick={() => setPlusPlan("monthly")}><strong>$1.99</strong><span>monthly</span></button>
+              <button className={plusPlan === "yearly" ? "selected" : ""} onClick={() => setPlusPlan("yearly")}><strong>$19.99</strong><span>yearly</span></button>
+            </div>
             <div className="plus-grid">
               {["Identity verification","Advanced Discover filters","Unlimited Discover","Who liked you","Persistent images","HD video calls","Custom profiles","Premium themes","Saved conversations","Private rooms","Advanced stats","Ad-free"].map(item => <div key={item}><Icon name="check" size={13} /> {item}</div>)}
             </div>
-            <button className="paypal-button" onClick={() => handlePlusCheckout("monthly")} disabled={paymentBusy}>{paymentBusy ? "OPENING PAYPAL..." : "Pay with PayPal"}</button>
-            <small className="trial-note">7-day trial · cancel anytime</small>{paymentError && <div className="form-error">{paymentError}</div>}
+            <button className="paypal-button" onClick={() => handlePlusCheckout(plusPlan)} disabled={paymentBusy}>{paymentBusy ? "OPENING PAYPAL..." : `CONTINUE WITH PAYPAL · ${plusPlan === "monthly" ? "$1.99/mo" : "$19.99/yr"}`}</button>
+            <small className="trial-note">Secure subscription checkout · cancel anytime</small>{paymentError && <div className="form-error">{paymentError}</div>}
           </div>
         </div>
       )}
@@ -500,6 +557,20 @@ function App() {
         </div>
       )}
 
+
+      {showChatMenu && (
+        <div className="chat-menu" onMouseDown={() => setShowChatMenu(false)}>
+          <button onClick={() => { setShowReport(true); setShowChatMenu(false); }}><Icon name="flag" size={14} /> Report person</button>
+          <button onClick={() => { setToast("Blocking will be connected to your account settings next."); setShowChatMenu(false); }}><Icon name="shield-ban" size={14} /> Block person</button>
+        </div>
+      )}
+
+      {showComposerTool && (
+        <div className="mini-notice" onClick={() => setShowComposerTool("")}>
+          <Icon name={showComposerTool === "image" ? "image" : showComposerTool === "voice" ? "mic" : "smile"} size={14} />
+          {showComposerTool === "image" ? "Image sharing is being connected." : showComposerTool === "voice" ? "Voice notes are being connected." : "Emoji picker is coming next."}
+        </div>
+      )}
 
       {showReport && (
         <div className="modal-backdrop" onMouseDown={() => setShowReport(false)}>
@@ -519,9 +590,9 @@ function App() {
       {showCall && (
         <div className="modal-backdrop call-layer">
           <div className="call-modal">
-            <div className="call-top"><span>ELSEWHR · {showCall.toUpperCase()}</span><span>00:42</span></div>
+            <div className="call-top"><span>ELSEWHR · {showCall.toUpperCase()}</span><span>CALL UI PREVIEW</span></div>
             <div className="call-stage" style={{background: person.gradient}}>
-              <div className="call-name">{person.name}_482</div>
+              <div className="call-name">{person.name}_482</div><div className="call-note">Live calling connects after WebRTC signaling is enabled.</div>
               {showCall === "video" && <div className="self-preview">YOU</div>}
             </div>
             <div className="call-controls">
@@ -530,6 +601,7 @@ function App() {
           </div>
         </div>
       )}
+      {toast && <div className="toast">{toast}</div>}
     </div>
   );
 }
