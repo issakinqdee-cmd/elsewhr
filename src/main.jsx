@@ -987,6 +987,7 @@ function App() {
               title: "New connection request",
               body: "Someone wants to connect with you.",
               icon: "heart",
+              action: "connections",
               sourceId: "connection-request-" + row.id + "-" + row.updated_at,
             });
           } else if ((isIncoming || isOutgoing) && row.status === "accepted") {
@@ -995,6 +996,7 @@ function App() {
               title: "Connection accepted",
               body: "Your connection is now active.",
               icon: "heart",
+              action: "connections",
               sourceId: "connection-accepted-" + row.id + "-" + row.updated_at,
             });
           }
@@ -1009,6 +1011,7 @@ function App() {
             body: payload.new?.title || "A new public room is live.",
             roomId: payload.new?.id || null,
             icon: "panels-top-left",
+            action: "rooms",
             sourceId: "room-created-" + payload.new?.id,
           });
         }
@@ -1031,6 +1034,7 @@ function App() {
               body: (room?.title || "A room") + " has a new member.",
               roomId: room.id,
               icon: "users-round",
+              action: "rooms",
               sourceId: "room-member-" + payload.new.room_id + "-" + payload.new.user_id + "-" + payload.new.joined_at,
             });
           }
@@ -1048,6 +1052,7 @@ function App() {
               : (incoming.body || "Someone sent you a message."),
             roomId: incoming.room_id,
             icon: incoming.media_path ? "paperclip" : "message-circle",
+            action: "messages",
             sourceId: "message-" + incoming.id,
           });
         } else if (!disposed && payload?.eventType === "UPDATE" && payload.new?.deleted_at && payload.old?.deleted_at !== payload.new.deleted_at) {
@@ -1081,6 +1086,7 @@ function App() {
               body: payload.new?.reaction ? payload.new.reaction + " on your message." : "Someone reacted to your message.",
               roomId,
               icon: "smile-plus",
+              action: "messages",
               sourceId: "reaction-" + payload.new.message_id + "-" + payload.new.user_id + "-" + payload.new.reaction,
             });
           }
@@ -1301,6 +1307,10 @@ function App() {
                 setNotificationPanel(false);
                 await openRoom(roomId);
                 navigateTo(roomId && rooms.some(room => room.id === roomId && room.kind === "group") ? "rooms" : "messages");
+              }}
+              onOpenPage={targetPage => {
+                setNotificationPanel(false);
+                navigateTo(targetPage);
               }}
             />
           )}
@@ -1947,7 +1957,7 @@ const GAME_CATALOG = [
   { id:"higher", title:"Higher or Lower", desc:"Call the next card.", icon:"arrow-up-down", premium:true },
 ];
 
-function NotificationPanel({ notifications, onClose, onClear, onOpenRoom }) {
+function NotificationPanel({ notifications, onClose, onClear, onOpenRoom, onOpenPage }) {
   return (
     <div className="notification-popover">
       <div className="notification-head">
@@ -1962,7 +1972,11 @@ function NotificationPanel({ notifications, onClose, onClear, onOpenRoom }) {
       </div>
       <div className="notification-list">
         {notifications.length ? notifications.map(item => (
-          <button key={item.id} className={"notification-item " + (item.read ? "" : "unread")} onClick={() => item.roomId ? onOpenRoom(item.roomId) : onClose()}>
+          <button key={item.id} className={"notification-item " + (item.read ? "" : "unread")} onClick={() => {
+            if (item.roomId) return onOpenRoom(item.roomId);
+            if (item.action) return onOpenPage(item.action);
+            onClose();
+          }}>
             <span className="notification-icon"><Icon name={item.icon || "bell"} size={15} /></span>
             <span className="notification-copy">
               <strong>{item.title}</strong>
@@ -2403,6 +2417,7 @@ function LiveChat({
         body: "Waiting for someone in this chat to join.",
         roomId: activeRoom.id,
         icon: "gamepad-2",
+        action: "messages",
       });
     } else if (gameItem.id === "reaction") {
       resetTogetherState("reaction");
@@ -2418,6 +2433,7 @@ function LiveChat({
         body: "Waiting for someone to join the duel.",
         roomId: activeRoom.id,
         icon: "zap",
+        action: "messages",
       });
     }
   }
@@ -2458,6 +2474,7 @@ function LiveChat({
       body: item.title + " is live.",
       roomId: activeRoom.id,
       icon: item.icon || "gamepad-2",
+      action: "messages",
     });
   }
 
