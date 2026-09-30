@@ -55,7 +55,7 @@ export async function listConnections(currentUserId) {
 
   const { data: profiles, error: profileError } = await client
     .from("profiles")
-    .select("id, username, display_name, age, country, primary_photo_url, verified_at")
+    .select("id, username, display_name, age, country, languages, interests, bio, primary_photo_url, verified_at, updated_at")
     .in("id", ids);
   if (profileError) throw profileError;
 
@@ -162,7 +162,7 @@ export async function getRoom(roomId) {
   if (ids.length) {
     const { data, error: profileError } = await client
       .from("profiles")
-      .select("id, username, display_name, age, country, primary_photo_url, verified_at, bio")
+      .select("id, username, display_name, age, country, languages, interests, primary_photo_url, verified_at, bio, updated_at")
       .in("id", ids);
     if (profileError) throw profileError;
     profiles = data ?? [];
