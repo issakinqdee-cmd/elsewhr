@@ -92,7 +92,8 @@ create table if not exists public.subscriptions (
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
-as $$
+set search_path = public
+as $
 begin
   new.updated_at = now();
   return new;
