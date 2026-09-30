@@ -226,16 +226,21 @@ export async function sendTextMessage(roomId, senderId, body, replyToId = null) 
 export async function editTextMessage(messageId, senderId, body) {
   const client = await requireSupabase();
   const nextBody = body.trim();
+  if (!messageId || !senderId) throw new Error("This message cannot be edited.");
   if (!nextBody) throw new Error("Message cannot be empty.");
+
+  const editedAt = new Date().toISOString();
   const { data, error } = await client
     .from("messages")
-    .update({ body: nextBody, edited_at: new Date().toISOString() })
+    .update({ body: nextBody, edited_at: editedAt })
     .eq("id", messageId)
     .eq("sender_id", senderId)
     .is("deleted_at", null)
     .select("id, room_id, sender_id, body, media_type, created_at, edited_at, deleted_at, reply_to_id")
-    .single();
+    .maybeSingle();
+
   if (error) throw error;
+  if (!data) throw new Error("That message can no longer be edited.");
   return data;
 }
 
