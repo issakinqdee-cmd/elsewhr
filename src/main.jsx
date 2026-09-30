@@ -2134,6 +2134,7 @@ function TogetherGamePicker({ games, isPlus, onClose, onSelect, onShowPlus }) {
 function TogetherGameOverlay({
   game,
   activeOther,
+  togetherReady,
   authUser,
   ttt,
   rps,
@@ -2172,10 +2173,10 @@ function TogetherGameOverlay({
 
           {game.id === "ttt" && (
             <div className="together-play-stage">
-              <div className="together-status">{ttt.winner === "draw" ? "DRAW" : ttt.winner ? (ttt.winner === authUser.id ? "YOU WIN" : "THEY WIN") : ttt.turn === authUser.id ? "YOUR TURN" : "THEIR TURN"}</div>
+              <div className="together-status">{!togetherReady ? "WAITING FOR OPPONENT" : ttt.winner === "draw" ? "DRAW" : ttt.winner ? (ttt.winner === authUser.id ? "YOU WIN" : "THEY WIN") : ttt.turn === authUser.id ? "YOUR TURN" : "THEIR TURN"}</div>
               <div className="duel-board">
                 {ttt.board.map((cell, index) => (
-                  <button key={index} className={"duel-cell " + (cell ? "filled " + cell.toLowerCase() : "")} onClick={() => onTttMove(index)}>{cell}</button>
+                  <button key={index} disabled={!togetherReady || Boolean(ttt.winner) || Boolean(cell)} className={"duel-cell " + (cell ? "filled " + cell.toLowerCase() : "")} onClick={() => onTttMove(index)}>{cell}</button>
                 ))}
               </div>
               <small>{mark ? "You are " + mark + "." : "Waiting for the game to start."}</small>
@@ -2184,10 +2185,10 @@ function TogetherGameOverlay({
 
           {game.id === "rps" && (
             <div className="together-play-stage">
-              <div className="together-status">{rps.result || (rps.self ? "Waiting for them..." : "Choose your move.")}</div>
+              <div className="together-status">{!togetherReady ? "WAITING FOR OPPONENT" : rps.result || (rps.self ? "Waiting for them..." : "Choose your move.")}</div>
               <div className="rps-kinetic">
                 {["rock","paper","scissors"].map(choice => (
-                  <button key={choice} className={rps.self === choice ? "chosen" : ""} disabled={Boolean(rps.self)} onClick={() => onRpsMove(choice)}>
+                  <button key={choice} className={rps.self === choice ? "chosen" : ""} disabled={!togetherReady || Boolean(rps.self)} onClick={() => onRpsMove(choice)}>
                     <span>{choice === "rock" ? "✊" : choice === "paper" ? "✋" : "✌️"}</span>
                     <small>{choice}</small>
                   </button>
@@ -2199,11 +2200,11 @@ function TogetherGameOverlay({
 
           {game.id === "reaction" && (
             <div className="together-play-stage">
-              <div className="together-status">{reactionDuel.status === "live" ? "GO!" : reactionDuel.self !== null ? "RESULT LOCKED" : "Ready?"}</div>
+              <div className="together-status">{!togetherReady ? "WAITING FOR OPPONENT" : reactionDuel.status === "live" ? "GO!" : reactionDuel.self !== null ? "RESULT LOCKED" : "Ready?"}</div>
               <button className={"duel-reaction-target " + (reactionDuel.status === "live" ? "live" : "")} onClick={reactionDuel.status === "live" ? onHitReaction : undefined}>
                 {reactionDuel.status === "live" ? "TAP" : reactionDuel.self !== null ? reactionDuel.self + " ms" : "WAIT"}
               </button>
-              <button className="secondary" onClick={onStartReaction}>{reactionDuel.self !== null || reactionDuel.opponent !== null ? "REMATCH" : "START DUEL"}</button>
+              <button className="secondary" disabled={!togetherReady} onClick={onStartReaction}>{!togetherReady ? "WAITING..." : reactionDuel.self !== null || reactionDuel.opponent !== null ? "REMATCH" : "START DUEL"}</button>
               <div className="reaction-score-row">
                 <span>You <strong>{reactionDuel.self === null ? "—" : reactionDuel.self + " ms"}</strong></span>
                 <span>{activeOther?.display_name || "Them"} <strong>{reactionDuel.opponent === null ? "—" : reactionDuel.opponent + " ms"}</strong></span>
@@ -2720,7 +2721,8 @@ function LiveChat({
       {togetherGame && !togetherMinimized && (
         <TogetherGameOverlay
           game={togetherGame}
-          activeOther={activeOther}
+          activeOther={activeRoom?.members?.find(member => member.user_id === togetherOpponentId)?.profile || activeOther}
+          togetherReady={togetherReady}
           authUser={authUser}
           ttt={ttt}
           rps={rps}
