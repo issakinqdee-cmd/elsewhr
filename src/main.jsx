@@ -136,7 +136,7 @@ function App() {
     ? visiblePeople[discoverIndex % visiblePeople.length]
     : null;
 
-  const messageRooms = rooms.filter(room => room.kind === "direct" || room.kind === "random");
+  const messageRooms = rooms.filter(room => room.kind === "direct");
   const groupRooms = rooms.filter(room => room.kind === "group");
   const activeOther = activeRoom?.members?.find(member => member.user_id !== authUser?.id)?.profile ?? null;
   const activeConnection = activeOther
@@ -259,7 +259,12 @@ function App() {
 
   async function openConnection(person) {
     if (!person?.id) return;
-    if (!isAnonymous && !profileReady) {
+    if (isAnonymous) {
+      setShowProfile(true);
+      setToast("Create a permanent account to message people.");
+      return;
+    }
+    if (!profileReady) {
       setShowProfile(true);
       setToast("Add a photo, name and age first. You can skip the extras.");
       return;
@@ -553,7 +558,12 @@ function App() {
 
   async function handleConnect(person) {
     if (!authUser || !person?.id) return;
-    if (!isAnonymous && !profileReady) {
+    if (isAnonymous) {
+      setShowProfile(true);
+      setToast("Create a permanent account to connect with people.");
+      return;
+    }
+    if (!profileReady) {
       setShowProfile(true);
       setToast("Add a photo, name and age first. You can skip the extras.");
       return;
@@ -813,6 +823,13 @@ function App() {
   }, [activeRoom]);
 
   useEffect(() => {
+    setOpenMessageActionsId(null);
+    setOpenReactionId(null);
+    setReplyToMessage(null);
+    setEditingMessageId(null);
+    setMessage("");
+    setShowChatMenu(false);
+
     if (!activeRoom?.id) {
       setActiveMessages([]);
       return;
@@ -1506,7 +1523,9 @@ function LiveChat({
               {activeConnection?.status === "accepted" ? "FRIENDS" : activeConnection?.status === "pending" && activeConnection?.direction === "incoming" ? "ACCEPT" : "ADD FRIEND"}
             </button>
           )}
-          <button aria-label="More options" onClick={onMenu}><Icon name="ellipsis" size={16} /></button>
+          {activeRoom.kind !== "group" && (
+            <button aria-label="More options" onClick={onMenu}><Icon name="ellipsis" size={16} /></button>
+          )}
         </div>
       </div>
 
@@ -1615,7 +1634,9 @@ function LiveChat({
       </form>
 
       <div className="chat-actions">
-        <button onClick={onReport}><Icon name="flag" size={15} /> REPORT</button>
+        {activeRoom.kind !== "group" && (
+          <button onClick={onReport}><Icon name="flag" size={15} /> REPORT</button>
+        )}
         <button onClick={onLeave}><Icon name="log-out" size={15} /> LEAVE</button>
       </div>
     </section>
