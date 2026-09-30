@@ -73,6 +73,8 @@ function App() {
   const [authBusy, setAuthBusy] = useState(false);
   const [accountError, setAccountError] = useState("");
   const [showWelcome, setShowWelcome] = useState(true);
+  const [showAuthForm, setShowAuthForm] = useState(false);
+  const [showAdvancedProfileFields, setShowAdvancedProfileFields] = useState(false);
 
   const [profile, setProfile] = useState(null);
   const [profileFile, setProfileFile] = useState(null);
@@ -355,10 +357,18 @@ function App() {
         throw new Error("Add a primary profile photo before joining ELSEWHR.");
       }
       const photo = profileFile ? await uploadAvatar(authUser.id, profileFile) : null;
-      const username = (document.getElementById("profile-username")?.value || "")
-        .replace(/[^a-zA-Z0-9_]/g, "")
+      const displayName = (document.getElementById("profile-display-name")?.value || "")
+        .trim()
+        .slice(0, 50);
+      if (!displayName) throw new Error("Add your name.");
+      const existingUsername = profile?.username || "";
+      const usernameBase = displayName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "")
+        .slice(0, 16);
+      const username = (existingUsername || (usernameBase || "elsewhr_member") + "_" + authUser.id.replace(/-/g, "").slice(0, 6))
         .slice(0, 24);
-      if (!username) throw new Error("Choose a username.");
       const age = Number(document.getElementById("profile-age")?.value || 0);
       if (age < 18) throw new Error("ELSEWHR is 18+.");
       await saveProfile({
@@ -785,27 +795,47 @@ function App() {
       <div className="auth-gate">
         <div className="auth-gate-inner">
           <div className="auth-gate-logo"><span className="brand-mark">E</span><strong>ELSEWHR</strong></div>
-          <span className="eyebrow">{authMode === "signup" ? "JOIN ELSEWHR" : "WELCOME BACK"}</span>
-          <h1>{authMode === "signup" ? "Go somewhere else." : "Someone, somewhere, is waiting."}</h1>
-          <p>Sign in, create your account, or enter anonymously.</p>
-          {supabaseConfigured ? (
+          {!showAuthForm ? (
             <>
-              <form onSubmit={handleAuth} className="auth-form auth-gate-form">
-                <div className="auth-toggle">
-                  <button type="button" className={authMode === "signin" ? "selected" : ""} onClick={() => { setAuthMode("signin"); setAccountError(""); }}>Sign in</button>
-                  <button type="button" className={authMode === "signup" ? "selected" : ""} onClick={() => { setAuthMode("signup"); setAccountError(""); }}>Sign up</button>
+              <span className="eyebrow">GO SOMEWHERE ELSE</span>
+              <h1>Get in.<br /><span>Find someone.</span></h1>
+              <p>No profile essay. No maze. Get inside first and figure the rest out later.</p>
+              {supabaseConfigured ? (
+                <div className="auth-quick-start">
+                  <button className="auth-quick-primary" onClick={handleAnonymous} disabled={authBusy}>
+                    <span><Icon name="zap" size={16} /> ENTER ELSEWHR</span>
+                    <small>Start anonymously</small>
+                  </button>
+                  <div className="auth-quick-secondary">
+                    <button onClick={() => { setAuthMode("signup"); setShowAuthForm(true); setAccountError(""); }}>CREATE ACCOUNT</button>
+                    <button onClick={() => { setAuthMode("signin"); setShowAuthForm(true); setAccountError(""); }}>SIGN IN</button>
+                  </div>
+                  <small className="auth-footnote">You can create a permanent profile later.</small>
                 </div>
-                <label>Email<input type="email" required value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder="you@example.com" /></label>
-                <label>Password<input type="password" minLength={8} required value={authPassword} onChange={e => setAuthPassword(e.target.value)} placeholder="At least 8 characters" /></label>
-                {accountError && <div className="form-error">{accountError}</div>}
-                <button className="primary full" disabled={authBusy}>{authBusy ? "WORKING..." : authMode === "signin" ? "SIGN IN" : "CREATE ACCOUNT"}</button>
-              </form>
-              <div className="auth-or"><span>OR</span></div>
-              <button className="secondary full anonymous-entry" onClick={handleAnonymous} disabled={authBusy}><Icon name="ghost" size={15} /> CONTINUE ANONYMOUSLY</button>
-              <small className="auth-footnote">Anonymous access uses a temporary account tied to this browser.</small>
+              ) : (
+                <div className="form-error">Supabase is not configured for this deployment.</div>
+              )}
             </>
           ) : (
-            <div className="form-error">Supabase is not configured for this deployment.</div>
+            <>
+              <button className="auth-back" onClick={() => { setShowAuthForm(false); setAccountError(""); }}><Icon name="arrow-left" size={14} /> BACK</button>
+              <span className="eyebrow">{authMode === "signup" ? "CREATE ACCOUNT" : "WELCOME BACK"}</span>
+              <h1>{authMode === "signup" ? "You're almost in." : "Welcome back."}</h1>
+              <p>{authMode === "signup" ? "Email and password. That's it." : "Pick up where you left off."}</p>
+              {supabaseConfigured && (
+                <form onSubmit={handleAuth} className="auth-form auth-gate-form">
+                  <div className="auth-toggle">
+                    <button type="button" className={authMode === "signin" ? "selected" : ""} onClick={() => { setAuthMode("signin"); setAccountError(""); }}>Sign in</button>
+                    <button type="button" className={authMode === "signup" ? "selected" : ""} onClick={() => { setAuthMode("signup"); setAccountError(""); }}>Sign up</button>
+                  </div>
+                  <label>Email<input type="email" required value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder="you@example.com" autoComplete="email" /></label>
+                  <label>Password<input type="password" minLength={8} required value={authPassword} onChange={e => setAuthPassword(e.target.value)} placeholder="At least 8 characters" autoComplete={authMode === "signup" ? "new-password" : "current-password"} /></label>
+                  {accountError && <div className="form-error">{accountError}</div>}
+                  <button className="primary full" disabled={authBusy}>{authBusy ? "WORKING..." : authMode === "signin" ? "SIGN IN" : "CREATE ACCOUNT"}</button>
+                  <button type="button" className="secondary full anonymous-entry" onClick={handleAnonymous} disabled={authBusy}><Icon name="ghost" size={15} /> JUST LET ME IN</button>
+                </form>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -1210,35 +1240,56 @@ function App() {
                 </div>
               </div>
             ) : (
-              <form onSubmit={handleProfileSave}>
-                <div className="photo-upload">
+              <form onSubmit={handleProfileSave} className="quick-profile-form">
+                <div className="quick-profile-head">
+                  <span className="eyebrow">QUICK START</span>
+                  <h3>Three things. Then you're in.</h3>
+                  <p>Everything else can be filled in later.</p>
+                </div>
+
+                <div className="photo-upload quick-photo-upload">
                   <div className="upload-avatar photo-preview" style={profilePreview ? { backgroundImage: "url(" + profilePreview + ")" } : undefined}>
-                    {!profilePreview && <Icon name="image-plus" size={21} />}
+                    {!profilePreview && <Icon name="camera" size={21} />}
                   </div>
-                  <div><strong>{profilePreview ? "Primary photo" : "Add your picture"}</strong><span>One real person · required for discovery</span></div>
-                  <label className="upload-button">Choose<input type="file" accept="image/png,image/jpeg,image/webp" onChange={e => {
+                  <div><strong>{profilePreview ? "Photo ready" : "Add your photo"}</strong><span>One real photo so people know you're real.</span></div>
+                  <label className="upload-button">CHOOSE<input type="file" accept="image/png,image/jpeg,image/webp" onChange={e => {
                     const selected = e.target.files?.[0] || null;
                     setProfileFile(selected);
                     if (selected) setProfilePreview(URL.createObjectURL(selected));
                   }} hidden /></label>
                 </div>
 
-                <div className="profile-form-grid">
-                  <label>Username<input id="profile-username" required minLength={3} maxLength={24} defaultValue={profile?.username || ""} /></label>
-                  <label>Display name<input id="profile-display-name" defaultValue={profile?.display_name || ""} /></label>
-                  <label>Age<input id="profile-age" required type="number" min="18" max="120" defaultValue={profile?.age || ""} /></label>
-                  <label>Country<input id="profile-country" defaultValue={profile?.country || ""} /></label>
-                  <label>Language<input id="profile-language" defaultValue={profile?.languages?.[0] || "English"} /></label>
-                  <label>Interests<input id="profile-interests" defaultValue={(profile?.interests || []).join(", ")} placeholder="Music, gaming, books" /></label>
+                <div className="profile-form-grid quick-profile-grid">
+                  <label>Name<input id="profile-display-name" required maxLength={50} defaultValue={profile?.display_name || (authUser?.email ? authUser.email.split("@")[0] : "")} placeholder="What should we call you?" autoComplete="name" /></label>
+                  <label>Age<input id="profile-age" required type="number" min="18" max="120" defaultValue={profile?.age || ""} placeholder="18+" inputMode="numeric" /></label>
                 </div>
 
-                <label className="profile-wide">Bio<textarea id="profile-bio" rows="3" defaultValue={profile?.bio || ""} placeholder="Tell people what you're into..." /></label>
+                <button type="button" className="advanced-toggle" onClick={() => setShowAdvancedProfileFields(value => !value)}>
+                  <span><Icon name="sliders-horizontal" size={14} /> {showAdvancedProfileFields ? "Hide extras" : "Add extras later"}</span>
+                  <Icon name={showAdvancedProfileFields ? "chevron-up" : "chevron-down"} size={14} />
+                </button>
+
+                {showAdvancedProfileFields && (
+                  <div className="profile-extra-fields">
+                    <label>Username<input id="profile-username" minLength={3} maxLength={24} defaultValue={profile?.username || ""} placeholder="Optional handle" /></label>
+                    <label>Country<input id="profile-country" defaultValue={profile?.country || ""} placeholder="Optional" /></label>
+                    <label>Language<input id="profile-language" defaultValue={profile?.languages?.[0] || "English"} placeholder="Optional" /></label>
+                    <label>Interests<input id="profile-interests" defaultValue={(profile?.interests || []).join(", ")} placeholder="Music, gaming, books" /></label>
+                    <label className="profile-wide">Bio<textarea id="profile-bio" rows="3" defaultValue={profile?.bio || ""} placeholder="Tell people what you're into..." /></label>
+                  </div>
+                )}
+
                 {accountError && <div className="form-error">{accountError}</div>}
-                <div className="profile-buttons">
-                  <button className="primary" disabled={profileSaving}>{profileSaving ? "SAVING..." : "SAVE PROFILE"}</button>
+                <div className="profile-buttons quick-profile-actions">
+                  <button className="primary" disabled={profileSaving}>{profileSaving ? "SETTING YOU UP..." : "GET ME IN"}</button>
                   <button type="button" className="secondary" onClick={() => signOut().then(() => { setAuthUser(null); setShowProfile(false); })}>SIGN OUT</button>
-                  <button type="button" className="danger-button" disabled={deleteBusy} onClick={handleDeleteAccount}>{deleteBusy ? "DELETING..." : "DELETE ACCOUNT"}</button>
                 </div>
+                {!isAnonymous && (
+                  <div className="profile-secondary-actions">
+                    <button type="button" className="link-button" onClick={() => setShowAdvancedProfileFields(true)}>Complete profile later</button>
+                    <button type="button" className="danger-link" disabled={deleteBusy} onClick={handleDeleteAccount}>{deleteBusy ? "DELETING..." : "Delete account"}</button>
+                  </div>
+                )}
               </form>
             )}
           </div>
