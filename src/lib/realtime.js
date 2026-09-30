@@ -114,7 +114,7 @@ export async function listRooms(currentUserId) {
 
   const { data: recentMessages, error: messageError } = await client
     .from("messages")
-    .select("id, room_id, sender_id, body, media_type, created_at, edited_at, deleted_at")
+    .select("id, room_id, sender_id, body, media_type, media_name, media_size, created_at, edited_at, deleted_at")
     .in("room_id", roomIds)
     .order("created_at", { ascending: false })
     .limit(250);
