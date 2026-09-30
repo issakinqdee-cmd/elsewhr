@@ -443,3 +443,52 @@ button{border:0;cursor:pointer}
 @media(max-width:620px){
   .chat-header-actions .chat-connect{display:inline-flex!important;padding:8px 9px;font-size:8px}
 }
+
+
+/* Scroll-safe auth and profile surfaces */
+.modal-backdrop{
+  overflow-y:auto;
+  overflow-x:hidden;
+  align-items:start;
+  overscroll-behavior:contain;
+}
+.modal{
+  max-height:calc(100vh - 40px);
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+}
+.auth-gate{
+  display:block;
+  overflow-y:auto;
+  overflow-x:hidden;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+}
+.auth-gate-inner{
+  min-height:calc(100vh - 56px);
+  width:min(470px,100%);
+  margin:0 auto;
+  padding:42px 0 64px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+}
+@media(max-height:760px){
+  .auth-gate-inner{justify-content:flex-start}
+}
+@media(max-width:620px){
+  .auth-gate{padding:20px}
+  .auth-gate-inner{
+    min-height:calc(100vh - 40px);
+    padding:28px 0 54px;
+    justify-content:flex-start;
+  }
+  .modal-backdrop{
+    padding:10px;
+  }
+  .modal{
+    max-height:calc(100vh - 20px);
+    border-radius:19px;
+  }
+}
