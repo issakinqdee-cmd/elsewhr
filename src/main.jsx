@@ -1751,7 +1751,12 @@ function App() {
         </div>
       )}
 
-      {toast && <div className="toast">{toast}</div>}
+      {toast && (
+        <div className="toast cute-toast">
+          <span className="toast-orb"><Icon name="sparkles" size={13} /></span>
+          <span>{toast}</span>
+        </div>
+      )}
     </>
   );
 }
