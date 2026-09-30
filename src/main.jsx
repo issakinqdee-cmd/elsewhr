@@ -1867,6 +1867,16 @@ function TogetherGameOverlay({ game, activeOther, authUser, ttt, rps, reactionDu
             </div>
           </div>
         )}
+        {!["ttt","rps","reaction"].includes(game.id) && (
+          <div className="together-play-stage">
+            <div className="premium-game-preview">
+              <Icon name={game.icon || "gamepad-2"} size={34} />
+              <span className="eyebrow">ELSEWHR+ GAME</span>
+              <h3>{game.title}</h3>
+              <p>This multiplayer game is reserved for the ELSEWHR+ arcade.</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1991,11 +2001,19 @@ function LiveChat({
     setTogetherGame(item);
     setIncomingInvite(null);
     resetTogetherState(item.id, incomingInvite.from);
+    const reactionDelay = 1900;
+    if (item.id === "reaction") {
+      if (reactionTimerRef.current) window.clearTimeout(reactionTimerRef.current);
+      reactionTimerRef.current = window.setTimeout(() => {
+        setReactionDuel(current => ({ ...current, status: "live", start: performance.now() }));
+      }, reactionDelay);
+    }
     sendTogether({
       kind: "start",
       gameId: item.id,
       starterId: incomingInvite.from,
       starterName: incomingInvite.fromName || "Player",
+      delay: item.id === "reaction" ? reactionDelay : undefined,
     });
   }
 
