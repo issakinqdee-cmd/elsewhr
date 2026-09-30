@@ -194,3 +194,25 @@ button{border:0;cursor:pointer}
 .matching-orbit b{animation-delay:-1.46s;transform:rotate(240deg) translateX(29px)}
 @keyframes matchingOrbit{from{transform:rotate(0deg) translateX(29px)}to{transform:rotate(360deg) translateX(29px)}}
 @keyframes matchingPulse{50%{transform:scale(1.04);box-shadow:0 0 42px rgba(200,255,82,.06)}}
+
+
+/* Final product polish */
+.photo-preview{background-size:cover;background-position:center;background-repeat:no-repeat}
+.plan-toggle{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:18px 0}
+.plan-toggle button{display:grid;gap:3px;text-align:left;padding:14px;background:#111;border:1px solid rgba(255,255,255,.08);color:#8f9088;border-radius:14px}
+.plan-toggle button.selected{background:rgba(200,255,82,.07);border-color:rgba(200,255,82,.28);color:#f2f2ee}
+.plan-toggle strong{font:700 22px/1 "Space Grotesk",sans-serif;color:inherit}
+.plan-toggle span{font-size:10px;letter-spacing:.05em;text-transform:uppercase}
+.chat-menu{position:absolute;right:24px;top:72px;z-index:20;display:grid;gap:4px;padding:7px;background:#121212;border:1px solid rgba(255,255,255,.1);border-radius:13px;box-shadow:0 20px 50px rgba(0,0,0,.4)}
+.chat-menu button{display:flex;align-items:center;gap:9px;padding:10px 11px;background:transparent;color:#babbb4;border-radius:9px;font-size:11px;text-align:left;white-space:nowrap}
+.chat-menu button:hover{background:#191919;color:#fff}
+.mini-notice{position:fixed;left:50%;bottom:86px;transform:translateX(-50%);z-index:60;display:flex;align-items:center;gap:8px;padding:10px 13px;border-radius:999px;background:#161616;border:1px solid rgba(255,255,255,.1);color:#d6d7d0;font-size:10px;box-shadow:0 14px 35px rgba(0,0,0,.35);animation:noticeIn .22s ease both}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:80;padding:11px 15px;border-radius:999px;background:#c8ff52;color:#10110b;font-size:11px;font-weight:800;box-shadow:0 16px 40px rgba(0,0,0,.35);animation:noticeIn .22s ease both}
+.call-note{position:absolute;left:50%;bottom:38px;transform:translateX(-50%);padding:7px 10px;border-radius:999px;background:rgba(8,8,8,.65);border:1px solid rgba(255,255,255,.12);color:#e0e0dc;font-size:9px;white-space:nowrap}
+@keyframes noticeIn{from{opacity:0;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
+@media(max-width:620px){
+  .plan-toggle strong{font-size:18px}
+  .chat-menu{right:12px;top:64px}
+  .call-note{max-width:85%;text-align:center;white-space:normal}
+  .toast{bottom:82px;max-width:88%;text-align:center}
+}
