@@ -57,7 +57,7 @@ function BrandMark({ size = 28 }) {
   );
 }
 
-const PAGE_ORDER = ["home", "random", "discover", "connections", "messages", "rooms"];
+const PAGE_ORDER = ["home", "random", "discover", "connections", "messages", "rooms", "games"];
 
 function initials(person) {
   const label = person?.display_name || person?.username || "E";
@@ -121,6 +121,12 @@ function App() {
 
   const [showPlus, setShowPlus] = useState(false);
   const [plusPlan, setPlusPlan] = useState("monthly");
+  const [game, setGame] = useState(null);
+  const [rpsChoice, setRpsChoice] = useState(null);
+  const [rpsResult, setRpsResult] = useState("");
+  const [reactionScore, setReactionScore] = useState(0);
+  const [reactionActive, setReactionActive] = useState(false);
+  const [reactionStart, setReactionStart] = useState(0);
   const [paymentBusy, setPaymentBusy] = useState(false);
   const [paymentError, setPaymentError] = useState("");
 
@@ -135,6 +141,7 @@ function App() {
   const matchingSinceRef = useRef(null);
   const isAnonymous = Boolean(authUser?.is_anonymous);
   const profileReady = Boolean(authUser && (isAnonymous || (profile?.primary_photo_path && profile?.age >= 18 && profile?.username)));
+  const isPlus = Boolean(profile?.is_plus);
   const visiblePeople = useMemo(() => {
     return discoverPeople.filter(person => {
       if (discoverOnlineOnly && !person.online) return false;
@@ -374,6 +381,49 @@ function App() {
 
     await refreshAll();
     await startRandomMatch();
+  }
+
+  function openGame(nextGame) {
+    if (nextGame.premium && !isPlus) {
+      setShowPlus(true);
+      setToast("This game is part of ELSEWHR+.");
+      return;
+    }
+    setGame(nextGame);
+    setRpsChoice(null);
+    setRpsResult("");
+    setReactionScore(0);
+    setReactionActive(false);
+    setReactionStart(0);
+  }
+
+  function playRps(choice) {
+    const choices = ["rock", "paper", "scissors"];
+    const computer = choices[Math.floor(Math.random() * choices.length)];
+    setRpsChoice(choice);
+    const result = choice === computer ? "Draw" :
+      (choice === "rock" && computer === "scissors") ||
+      (choice === "paper" && computer === "rock") ||
+      (choice === "scissors" && computer === "paper")
+        ? "You win"
+        : "ELSEWHR wins";
+    setRpsResult(`${result} · ELSEWHR chose ${computer}`);
+  }
+
+  function startReactionGame() {
+    setReactionScore(0);
+    setReactionActive(false);
+    const delay = 900 + Math.floor(Math.random() * 2200);
+    window.setTimeout(() => {
+      setReactionActive(true);
+      setReactionStart(performance.now());
+    }, delay);
+  }
+
+  function hitReaction() {
+    if (!reactionActive) return;
+    setReactionScore(Math.round(performance.now() - reactionStart));
+    setReactionActive(false);
   }
 
   async function handleAuth(event) {
@@ -993,6 +1043,7 @@ function App() {
     ["connections", "heart", "Connections"],
     ["messages", "message-circle", "Messages"],
     ["rooms", "panels-top-left", "Rooms"],
+    ["games", "gamepad-2", "Games"],
   ];
 
   return (
@@ -1307,6 +1358,22 @@ function App() {
               </section>
             )}
 
+            {page === "games" && (
+              <GamesPage
+                isPlus={isPlus}
+                game={game}
+                setGame={setGame}
+                rpsChoice={rpsChoice}
+                rpsResult={rpsResult}
+                onRps={playRps}
+                reactionScore={reactionScore}
+                reactionActive={reactionActive}
+                onStartReaction={startReactionGame}
+                onHitReaction={hitReaction}
+                onOpenGame={openGame}
+              />
+            )}
+
             {page === "rooms" && (
               activeRoom?.kind === "group" ? (
                 <div className="room-chat-surface">
@@ -1413,6 +1480,20 @@ function App() {
           ))}
         </nav>
       </div>
+
+      {game && (
+        <GameModal
+          game={game}
+          setGame={setGame}
+          rpsChoice={rpsChoice}
+          rpsResult={rpsResult}
+          onRps={playRps}
+          reactionScore={reactionScore}
+          reactionActive={reactionActive}
+          onStartReaction={startReactionGame}
+          onHitReaction={hitReaction}
+        />
+      )}
 
       {showProfile && (
         <div className="modal-backdrop" onMouseDown={() => setShowProfile(false)}>
@@ -1536,6 +1617,97 @@ function App() {
 
       {toast && <div className="toast">{toast}</div>}
     </>
+  );
+}
+
+
+const GAME_CATALOG = [
+  { id:"rps", title:"Rock Paper Scissors", desc:"Quick rounds. Outsmart the room.", icon:"hand-rock", premium:false },
+  { id:"reaction", title:"Reaction Rush", desc:"How fast are your reactions?", icon:"zap", premium:false },
+  { id:"ttt", title:"Tic Tac Toe", desc:"Classic 3x3 duel.", icon:"grid-3x3", premium:false },
+  { id:"chess", title:"Chess", desc:"Classic strategy, ELSEWHR style.", icon:"crown", premium:true },
+  { id:"checkers", title:"Checkers", desc:"Fast board battles.", icon:"circle-dot", premium:true },
+  { id:"connect4", title:"Connect Four", desc:"Drop four. Win the row.", icon:"columns-3", premium:true },
+  { id:"memory", title:"Memory Match", desc:"Flip, remember, match.", icon:"brain", premium:true },
+  { id:"2048", title:"2048", desc:"Stack numbers. Chase 2048.", icon:"hash", premium:true },
+  { id:"snake", title:"Snake", desc:"Grow without hitting yourself.", icon:"move", premium:true },
+  { id:"minesweeper", title:"Minesweeper", desc:"Clear the board without a mistake.", icon:"bomb", premium:true },
+  { id:"scramble", title:"Word Scramble", desc:"Unscramble it before time.", icon:"text-cursor-input", premium:true },
+  { id:"hangman", title:"Hangman", desc:"Guess the hidden word.", icon:"circle-help", premium:true },
+  { id:"sudoku", title:"Sudoku", desc:"Fill every square.", icon:"table-2", premium:true },
+  { id:"battleship", title:"Battleship", desc:"Find their fleet first.", icon:"ship-wheel", premium:true },
+  { id:"darts", title:"Darts", desc:"Hit the target, chase the score.", icon:"target", premium:true },
+  { id:"higher", title:"Higher or Lower", desc:"Call the next card.", icon:"arrow-up-down", premium:true },
+];
+
+function GamesPage({ isPlus, game, setGame, rpsChoice, rpsResult, onRps, reactionScore, reactionActive, onStartReaction, onHitReaction, onOpenGame }) {
+  return (
+    <section className="games-page">
+      <div className="section-heading games-heading">
+        <div>
+          <span className="eyebrow">ELSEWHR ARCADE</span>
+          <h2>Play. Compete. Stay awhile.</h2>
+        </div>
+        <div className="games-count"><strong>3</strong><span>FREE</span><i>+</i><strong>13</strong><span>PLUS</span></div>
+      </div>
+
+      <div className="games-intro">
+        <p>Three games are open to everyone. Thirteen more are part of ELSEWHR+.</p>
+        {!isPlus && <button className="secondary" onClick={() => document.querySelector(".plus-modal") ? null : null}>13 MORE WITH PLUS</button>}
+      </div>
+
+      <div className="games-grid">
+        {GAME_CATALOG.map(item => (
+          <article key={item.id} className={"game-card " + (item.premium ? "premium-game" : "free-game")}>
+            <div className="game-card-top">
+              <span className="game-icon"><Icon name={item.icon} size={20} /></span>
+              {item.premium ? <span className="game-lock"><Icon name={isPlus ? "unlock" : "lock"} size={11} /> {isPlus ? "PLUS" : "PLUS"}</span> : <span className="game-free">FREE</span>}
+            </div>
+            <h3>{item.title}</h3>
+            <p>{item.desc}</p>
+            <button className={item.premium && !isPlus ? "secondary" : "primary"} onClick={() => item.id === "ttt" ? onOpenGame(item) : onOpenGame(item)}>
+              {item.premium && !isPlus ? "UNLOCK" : "PLAY"}
+            </button>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function GameModal({ game, setGame, rpsChoice, rpsResult, onRps, reactionScore, reactionActive, onStartReaction, onHitReaction }) {
+  return (
+    <div className="modal-backdrop" onMouseDown={() => setGame(null)}>
+      <div className="modal game-modal" onMouseDown={e => e.stopPropagation()}>
+        <div className="modal-top">
+          <span className="eyebrow">ELSEWHR ARCADE</span>
+          <button onClick={() => setGame(null)} aria-label="Close"><Icon name="x" size={16} /></button>
+        </div>
+        <h2>{game.title}</h2>
+        {game.id === "rps" ? (
+          <div className="game-panel">
+            <p>Choose your move.</p>
+            <div className="rps-grid">
+              {["rock","paper","scissors"].map(choice => <button key={choice} className={rpsChoice === choice ? "selected" : ""} onClick={() => onRps(choice)}>{choice.toUpperCase()}</button>)}
+            </div>
+            {rpsResult && <div className="game-result">{rpsResult}</div>}
+          </div>
+        ) : game.id === "reaction" ? (
+          <div className="game-panel reaction-panel">
+            <p>Start, wait for the signal, then hit the button.</p>
+            <button className={reactionActive ? "reaction-target live" : "reaction-target"} onClick={reactionActive ? onHitReaction : undefined}>
+              {reactionActive ? "TAP!" : "WAIT"}
+            </button>
+            {reactionScore > 0 && <div className="game-result">{reactionScore} ms</div>}
+            <button className="secondary" onClick={onStartReaction}>START ROUND</button>
+          </div>
+        ) : (
+          <div className="game-panel">
+            <div className="placeholder-game"><Icon name={game.icon} size={32} /><strong>{game.title}</strong><span>The ELSEWHR+ arcade slot is reserved for this game.</span></div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
