@@ -119,6 +119,8 @@ function App() {
   const [toast, setToast] = useState("");
   const activeRoomRef = useRef(null);
   const authUserRef = useRef(null);
+  const isMatchingRef = useRef(false);
+  const matchingSinceRef = useRef(null);
   const isAnonymous = Boolean(authUser?.is_anonymous);
   const profileReady = Boolean(authUser && (isAnonymous || (profile?.primary_photo_path && profile?.age >= 18 && profile?.username)));
   const onlineCount = discoverPeople.filter(person => person.online).length;
@@ -188,16 +190,18 @@ function App() {
       setConnections(nextConnections);
       setRooms(nextRooms);
 
-      if (isMatching && matchingSince) {
+      const liveMatching = isMatchingRef.current;
+      const liveMatchingSince = matchingSinceRef.current;
+      if (liveMatching && liveMatchingSince) {
         const newMatch = nextRooms.find(room =>
           room.kind === "random" &&
           room.created_at &&
-          new Date(room.created_at).getTime() >= matchingSince - 1500
+          new Date(room.created_at).getTime() >= liveMatchingSince - 1500
         );
         if (newMatch) {
           const full = await getRoom(newMatch.id);
           setCurrentRoom(full);
-          setActiveMessages(await listMessages(full.id));
+          setActiveMessages(await listMessages(full.id, authUser.id));
           setIsMatching(false);
           setMatchingSince(null);
           navigateTo("random");
@@ -215,7 +219,7 @@ function App() {
       return;
     }
     try {
-      const next = await listMessages(roomId);
+      const next = await listMessages(roomId, authUser?.id);
       setActiveMessages(next);
     } catch (error) {
       setDataError(error.message || "Messages could not be loaded.");
@@ -241,7 +245,7 @@ function App() {
 
       const full = await getRoom(baseRoom.id);
       setCurrentRoom(full);
-      setActiveMessages(await listMessages(full.id));
+      setActiveMessages(await listMessages(full.id, authUser.id));
       if (navigateToMessages) navigateTo("messages");
     } catch (error) {
       setDataError(error.message || "Room could not be opened.");
@@ -262,7 +266,7 @@ function App() {
       const roomId = await findOrCreateDirectRoom(person.id);
       const full = await getRoom(roomId);
       setCurrentRoom(full);
-      setActiveMessages(await listMessages(roomId));
+      setActiveMessages(await listMessages(roomId, authUser.id));
       navigateTo("messages");
     } catch (error) {
       setDataError(error.message || "Conversation could not be opened.");
@@ -283,8 +287,11 @@ function App() {
       return;
     }
     setDataError("");
+    const now = Date.now();
     setIsMatching(true);
-    setMatchingSince(Date.now());
+    setMatchingSince(now);
+    isMatchingRef.current = true;
+    matchingSinceRef.current = now;
     activeRoomRef.current = null;
     setActiveRoom(null);
     setActiveMessages([]);
@@ -293,9 +300,11 @@ function App() {
       if (roomId) {
         const full = await getRoom(roomId);
         setCurrentRoom(full);
-        setActiveMessages(await listMessages(roomId));
+        setActiveMessages(await listMessages(roomId, authUser.id));
         setIsMatching(false);
         setMatchingSince(null);
+        isMatchingRef.current = false;
+        matchingSinceRef.current = null;
         navigateTo("random");
         setToast("Matched with someone in real time.");
       } else {
@@ -304,6 +313,8 @@ function App() {
     } catch (error) {
       setIsMatching(false);
       setMatchingSince(null);
+      isMatchingRef.current = false;
+      matchingSinceRef.current = null;
       setDataError(error.message || "Random matching is unavailable.");
     }
   }
@@ -316,6 +327,8 @@ function App() {
     }
     setIsMatching(false);
     setMatchingSince(null);
+    isMatchingRef.current = false;
+    matchingSinceRef.current = null;
   }
 
   async function handleAuth(event) {
@@ -366,7 +379,8 @@ function App() {
         .trim()
         .slice(0, 50);
       if (!displayName) throw new Error("Add your name.");
-      const existingUsername = profile?.username || "";
+      const requestedUsername = document.getElementById("profile-username")?.value?.trim() || "";
+      const existingUsername = profile?.username || requestedUsername;
       const usernameBase = displayName
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "_")
@@ -399,6 +413,23 @@ function App() {
       setAccountError(error.message || "Could not save your profile.");
     } finally {
       setProfileSaving(false);
+    }
+  }
+
+  async function handleSignOut() {
+    try {
+      await signOut();
+      setAuthUser(null);
+      authUserRef.current = null;
+      setProfile(null);
+      setProfilePreview("");
+      setCurrentRoom(null);
+      setActiveMessages([]);
+      setShowProfile(false);
+      setShowAuthForm(false);
+      setAccountError("");
+    } catch (error) {
+      setAccountError(error.message || "Could not sign out.");
     }
   }
 
@@ -530,7 +561,7 @@ function App() {
       if (result?.status === "accepted" && result?.room_id) {
         const full = await getRoom(result.room_id);
         setCurrentRoom(full);
-        setActiveMessages(await listMessages(full.id));
+        setActiveMessages(await listMessages(full.id, authUser.id));
         setToast("You are connected. This Random conversation is now saved.");
       } else {
         setToast("Connection request sent.");
@@ -547,7 +578,7 @@ function App() {
       if (status === "accepted" && result?.room_id) {
         const full = await getRoom(result.room_id);
         setCurrentRoom(full);
-        setActiveMessages(await listMessages(full.id));
+        setActiveMessages(await listMessages(full.id, authUser.id));
         setToast("Connection accepted. Your Random conversation is saved in Messages.");
       }
     } catch (error) {
@@ -1244,8 +1275,8 @@ function App() {
               <div className="guest-profile">
                 <div className="guest-card"><div className="guest-symbol"><Icon name="user-round" size={20} /></div><div><strong>Anonymous guest</strong><span>This temporary account is tied to this browser session.</span></div></div>
                 <div className="profile-buttons guest-actions">
-                  <button className="primary" onClick={() => { setAuthMode("signup"); setShowAuthForm(true); setShowProfile(false); setAccountError(""); signOut().catch(() => {}); setAuthUser(null); }}>CREATE ACCOUNT</button>
-                  <button className="secondary" onClick={() => signOut().catch(() => {})}>LEAVE ELSEWHR</button>
+                  <button className="primary" onClick={async () => { setAuthMode("signup"); setShowAuthForm(true); setShowProfile(false); setAccountError(""); await signOut().catch(() => {}); setAuthUser(null); authUserRef.current = null; }}>CREATE ACCOUNT</button>
+                  <button className="secondary" onClick={handleSignOut}>LEAVE ELSEWHR</button>
                   <button className="danger-button" disabled={deleteBusy} onClick={handleDeleteAccount}>{deleteBusy ? "DELETING..." : "DELETE ACCOUNT"}</button>
                 </div>
               </div>
@@ -1292,11 +1323,11 @@ function App() {
                 {accountError && <div className="form-error">{accountError}</div>}
                 <div className="profile-buttons quick-profile-actions">
                   <button className="primary" disabled={profileSaving}>{profileSaving ? "SETTING YOU UP..." : "GET ME IN"}</button>
-                  <button type="button" className="secondary" onClick={() => signOut().then(() => { setAuthUser(null); setShowProfile(false); })}>SIGN OUT</button>
+                  <button type="button" className="secondary" onClick={handleSignOut}>SIGN OUT</button>
                 </div>
                 {!isAnonymous && (
                   <div className="profile-secondary-actions">
-                    <button type="button" className="link-button" onClick={() => setShowAdvancedProfileFields(true)}>Complete profile later</button>
+                    <button type="button" className="link-button" onClick={() => { setShowProfile(false); setToast("You can finish the extras anytime from My Profile."); }}>Complete profile later</button>
                     <button type="button" className="danger-link" disabled={deleteBusy} onClick={handleDeleteAccount}>{deleteBusy ? "DELETING..." : "Delete account"}</button>
                   </div>
                 )}
