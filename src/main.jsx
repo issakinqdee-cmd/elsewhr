@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
 import { supabase, supabaseConfigured } from "./lib/supabase";
-import { getCurrentUser, getProfile, saveProfile, signInWithEmail, signOut, signUpWithEmail, uploadAvatar } from "./lib/account";
+import { deleteAccount, getCurrentUser, getProfile, saveProfile, signInAnonymously, signInWithEmail, signOut, signUpWithEmail, uploadAvatar } from "./lib/account";
 import { startPaypalSubscription } from "./lib/paypal";
 
 const discoverPeople = [
@@ -45,6 +45,8 @@ function App() {
   const [authPassword, setAuthPassword] = useState("");
   const [authMode, setAuthMode] = useState("signin");
   const [authBusy, setAuthBusy] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const [profileFile, setProfileFile] = useState(null);
   const [profileSaving, setProfileSaving] = useState(false);
   const [accountError, setAccountError] = useState("");
@@ -61,7 +63,8 @@ function App() {
   const [isMatching, setIsMatching] = useState(false);
   const [matchSeconds, setMatchSeconds] = useState(0);
   const person = discoverPeople[discoverIndex % discoverPeople.length];
-  const profileReady = Boolean(authUser && profile?.primary_photo_path && profile?.age >= 18 && profile?.username);
+  const isAnonymous = Boolean(authUser?.is_anonymous);
+  const profileReady = Boolean(authUser && (isAnonymous || (profile?.primary_photo_path && profile?.age >= 18 && profile?.username)));
 
   function goSocial(nextPage) {
     if (!authUser || !profileReady) {
@@ -99,10 +102,11 @@ function App() {
     }).catch(() => {
       setAuthUser(null);
       setProfile(null);
-    });
+    }).finally(() => setAuthChecked(true));
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       const user = session?.user ?? null;
       setAuthUser(user);
+      setAuthChecked(true);
       if (user) refreshProfile(user);
       else setProfile(null);
     });
@@ -139,6 +143,21 @@ function App() {
     }, 1000);
     return () => window.clearInterval(timer);
   }, [isMatching]);
+
+  async function handleAnonymous() {
+    setAuthBusy(true);
+    setAccountError("");
+    try {
+      const result = await signInAnonymously();
+      setAuthUser(result.user ?? null);
+      setShowProfile(false);
+      setToast("You're in anonymously.");
+    } catch (error) {
+      setAccountError(error.message || "Anonymous access is not enabled yet.");
+    } finally {
+      setAuthBusy(false);
+    }
+  }
 
   async function handleAuth(e) {
     e.preventDefault();
@@ -193,6 +212,27 @@ function App() {
       setAccountError(error.message || "Could not save your profile.");
     } finally {
       setProfileSaving(false);
+    }
+  }
+
+  async function handleDeleteAccount() {
+    const confirmed = window.confirm("Delete your ELSEWHR account permanently? This removes your profile and account data and cannot be undone.");
+    if (!confirmed) return;
+
+    setDeleteBusy(true);
+    setAccountError("");
+    try {
+      await deleteAccount();
+      setAuthUser(null);
+      setProfile(null);
+      setProfilePreview("");
+      setProfileFile(null);
+      setShowProfile(false);
+      setToast("Your account has been deleted.");
+    } catch (error) {
+      setAccountError(error.message || "Could not delete your account.");
+    } finally {
+      setDeleteBusy(false);
     }
   }
 
@@ -289,7 +329,7 @@ function App() {
           <div className="welcome-tag">GO SOMEWHERE ELSE.</div>
         </div>
       )}
-      <div className="app-shell">
+      <div className={`app-shell ${!authUser ? "locked-shell" : ""}`}>
       <aside className="sidebar">
         <button className="brand" onClick={() => navigateTo("home")}>
           <span className="brand-mark">E</span>
@@ -317,7 +357,7 @@ function App() {
         </div>
 
         <div className="sidebar-bottom">
-          <button className="nav-item" onClick={() => setShowProfile(true)}><span className="nav-icon"><Icon name="user-circle-2" /></span><span>Profile</span></button>
+          <button className="nav-item" onClick={() => setShowProfile(true)}><span className="nav-icon"><Icon name="user-circle-2" /></span><span>My Profile</span></button>
           <button className="nav-item" onClick={() => setShowPlus(true)}><span className="nav-icon"><Icon name="sparkles" /></span><span>ELSEWHR+</span></button>
         </div>
       </aside>
@@ -334,7 +374,7 @@ function App() {
                 <button className="top-signup" onClick={() => { setAuthMode("signup"); setShowProfile(true); }}>Sign up</button>
               </>
             ) : (
-              <button className="avatar-button" onClick={() => setShowProfile(true)}>{(profile?.display_name || profile?.username || authEmail || "E").slice(0,1).toUpperCase()}</button>
+              <button className="avatar-button" onClick={() => setShowProfile(true)}>{(profile?.display_name || profile?.username || (isAnonymous ? "G" : authEmail) || "E").slice(0,1).toUpperCase()}</button>
             )}
           </div>
         </header>
@@ -508,9 +548,9 @@ function App() {
       {showProfile && (
         <div className="modal-backdrop" onMouseDown={() => setShowProfile(false)}>
           <div className="modal profile-modal" onMouseDown={e => e.stopPropagation()}>
-            <div className="modal-top"><span className="eyebrow">{authUser ? "PROFILE" : authMode === "signup" ? "JOIN ELSEWHR" : "WELCOME BACK"}</span><button onClick={() => setShowProfile(false)} aria-label="Close"><Icon name="x" size={16} /></button></div>
-            <h2>{authUser ? "Show people there's a real person here." : authMode === "signup" ? "Meet someone you would've never met." : "Good to see you again."}</h2>
-            <p className="modal-copy">A real primary photo helps us keep ELSEWHR human and reduces fake, explicit, and spam-heavy profiles.</p>
+            <div className="modal-top"><span className="eyebrow">{authUser ? (isAnonymous ? "ANONYMOUS" : "MY PROFILE") : authMode === "signup" ? "JOIN ELSEWHR" : "WELCOME BACK"}</span>{authUser && isAnonymous && <span className="guest-badge">GUEST</span>}<button onClick={() => setShowProfile(false)} aria-label="Close"><Icon name="x" size={16} /></button></div>
+            <h2>{authUser ? (isAnonymous ? "You're here anonymously." : "Your ELSEWHR profile.") : authMode === "signup" ? "Meet someone you would've never met." : "Good to see you again."}</h2>
+            <p className="modal-copy">{authUser ? (isAnonymous ? "You can explore ELSEWHR without sharing your email. Create an account later to keep a permanent identity." : "Manage your profile, sign out, or permanently delete your account.") : "A real primary photo helps us keep ELSEWHR human and reduces fake, explicit, and spam-heavy profiles."}</p>
             {!supabaseConfigured && <div className="verification-callout"><span><Icon name="info" size={18} /></span><div><strong>Prototype mode</strong><p>Connect the Supabase environment to enable real accounts, profile storage and realtime features.</p></div></div>}
             {supabaseConfigured && !authUser && (
               <form onSubmit={handleAuth} className="auth-form">
@@ -521,7 +561,17 @@ function App() {
                 <button className="primary full" disabled={authBusy}>{authBusy ? "WORKING..." : authMode === "signin" ? "SIGN IN" : "CREATE ACCOUNT"}</button>
               </form>
             )}
-            {supabaseConfigured && authUser && (
+            {supabaseConfigured && authUser && isAnonymous && (
+              <div className="guest-profile">
+                <div className="guest-card"><div className="guest-symbol"><Icon name="user-round" size={20} /></div><div><strong>Anonymous guest</strong><span>This account is temporary and tied to this browser session.</span></div></div>
+                <div className="profile-buttons guest-actions">
+                  <button type="button" className="primary" onClick={() => { setAuthMode("signup"); setAuthUser(null); signOut().catch(() => {}); }}>CREATE ACCOUNT</button>
+                  <button type="button" className="secondary" onClick={() => signOut().catch(() => {})}>LEAVE ELSEWHR</button>
+                  <button type="button" className="danger-button" disabled={deleteBusy} onClick={handleDeleteAccount}>{deleteBusy ? "DELETING..." : "DELETE ANONYMOUS ACCOUNT"}</button>
+                </div>
+              </div>
+            )}
+            {supabaseConfigured && authUser && !isAnonymous && (
               <form onSubmit={handleProfileSave}>
                 <div className="photo-upload">
                   <div className="upload-avatar photo-preview" style={profilePreview ? { backgroundImage: `url(${profilePreview})` } : undefined}>
@@ -547,9 +597,30 @@ function App() {
                   <span><Icon name="shield-check" size={18} /></span>
                   <div><strong>Verification</strong><p>ELSEWHR+ will include identity verification and verified-only discovery.</p></div>
                 </div>
-                <div className="profile-buttons"><button className="primary" disabled={profileSaving}>{profileSaving ? "SAVING..." : "SAVE PROFILE"}</button><button type="button" className="secondary" onClick={() => signOut().then(() => setAuthUser(null))}>SIGN OUT</button></div>
+                <div className="profile-buttons"><button className="primary" disabled={profileSaving}>{profileSaving ? "SAVING..." : "SAVE PROFILE"}</button><button type="button" className="secondary" onClick={() => signOut().then(() => setAuthUser(null))}>SIGN OUT</button><button type="button" className="danger-button" disabled={deleteBusy} onClick={handleDeleteAccount}>{deleteBusy ? "DELETING..." : "DELETE ACCOUNT"}</button></div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {!authUser && authChecked && !showWelcome && (
+        <div className="auth-gate" role="dialog" aria-modal="true" aria-labelledby="auth-gate-title">
+          <div className="auth-gate-inner">
+            <div className="auth-gate-logo"><span className="brand-mark">E</span><strong>ELSEWHR</strong></div>
+            <span className="eyebrow">{authMode === "signup" ? "JOIN ELSEWHR" : "WELCOME BACK"}</span>
+            <h1 id="auth-gate-title">{authMode === "signup" ? "Go somewhere else." : "The internet is bigger than your circle."}</h1>
+            <p>Sign in, create your account, or enter anonymously to explore ELSEWHR.</p>
+            <form onSubmit={handleAuth} className="auth-form auth-gate-form">
+              <div className="auth-toggle"><button type="button" className={authMode === "signin" ? "selected" : ""} onClick={() => { setAuthMode("signin"); setAccountError(""); }}>Sign in</button><button type="button" className={authMode === "signup" ? "selected" : ""} onClick={() => { setAuthMode("signup"); setAccountError(""); }}>Sign up</button></div>
+              <label>Email<input type="email" required value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder="you@example.com" /></label>
+              <label>Password<input type="password" minLength={8} required value={authPassword} onChange={e => setAuthPassword(e.target.value)} placeholder="At least 8 characters" /></label>
+              {accountError && <div className="form-error">{accountError}</div>}
+              <button className="primary full" disabled={authBusy}>{authBusy ? "WORKING..." : authMode === "signin" ? "SIGN IN" : "CREATE ACCOUNT"}</button>
+            </form>
+            <div className="auth-or"><span>OR</span></div>
+            <button className="secondary full anonymous-entry" onClick={handleAnonymous} disabled={authBusy}><Icon name="incognito" size={15} /> CONTINUE ANONYMOUSLY</button>
+            <small className="auth-footnote">Anonymous access creates a temporary account. You can create a permanent account later.</small>
           </div>
         </div>
       )}
