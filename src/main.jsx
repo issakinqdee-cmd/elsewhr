@@ -440,7 +440,7 @@ function App() {
       setRoomDescription("");
       await refreshAll();
       setToast("Room created.");
-      await openRoom(room.id);
+      await openRoom(room);
     } catch (error) {
       setDataError(error.message || "Room could not be created.");
     } finally {
@@ -961,7 +961,7 @@ function App() {
                       const joined = room.members?.some(member => member.user_id === authUser.id && !member.left_at);
                       return (
                         <article className="room-card" key={room.id}>
-                          <div className="room-card-top"><span className="eyebrow">PUBLIC ROOM</span><span>{room.members?.length || 0} live</span></div>
+                          <div className="room-card-top"><span className="eyebrow">PUBLIC ROOM</span><span>{joined ? (room.members?.length || 1) + " live" : "OPEN"}</span></div>
                           <h3>{room.title || "Untitled room"}</h3>
                           <p>{room.description || "No description."}</p>
                           <button className="secondary" onClick={() => joined ? openRoom(room.id) : handleJoinRoom(room)}>{joined ? "OPEN ROOM" : "JOIN ROOM"}</button>
