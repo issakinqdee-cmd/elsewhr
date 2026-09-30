@@ -113,6 +113,7 @@ function App() {
 
   const [isMatching, setIsMatching] = useState(false);
   const [matchingSince, setMatchingSince] = useState(null);
+  const [siteOnlineCount, setSiteOnlineCount] = useState(0);
 
   const [roomTitle, setRoomTitle] = useState("");
   const [roomDescription, setRoomDescription] = useState("");
@@ -134,7 +135,6 @@ function App() {
   const matchingSinceRef = useRef(null);
   const isAnonymous = Boolean(authUser?.is_anonymous);
   const profileReady = Boolean(authUser && (isAnonymous || (profile?.primary_photo_path && profile?.age >= 18 && profile?.username)));
-  const onlineCount = discoverPeople.filter(person => person.online).length;
   const visiblePeople = useMemo(() => {
     return discoverPeople.filter(person => {
       if (discoverOnlineOnly && !person.online) return false;
@@ -844,6 +844,32 @@ function App() {
       })
       .subscribe();
 
+    const sitePresence = supabase.channel("elsewhr-site-presence", {
+      config: { presence: { key: authUser.id } },
+    });
+
+    const updateSitePresenceCount = () => {
+      const state = sitePresence.presenceState();
+      setSiteOnlineCount(Object.keys(state).length);
+    };
+
+    sitePresence
+      .on("presence", { event: "sync" }, updateSitePresenceCount)
+      .on("presence", { event: "join" }, updateSitePresenceCount)
+      .on("presence", { event: "leave" }, updateSitePresenceCount)
+      .subscribe(async status => {
+        if (status !== "SUBSCRIBED") return;
+        try {
+          await sitePresence.track({
+            user_id: authUser.id,
+            online_at: new Date().toISOString(),
+          });
+          updateSitePresenceCount();
+        } catch {
+          setSiteOnlineCount(current => current || 1);
+        }
+      });
+
     const markOffline = () => {
       touchPresence(false).catch(() => {});
     };
@@ -854,6 +880,9 @@ function App() {
       window.clearInterval(heartbeat);
       window.removeEventListener("beforeunload", markOffline);
       supabase.removeChannel(channel);
+      sitePresence.untrack().catch(() => {});
+      supabase.removeChannel(sitePresence);
+      setSiteOnlineCount(0);
       touchPresence(false).catch(() => {});
     };
   }, [authUser?.id]);
@@ -992,7 +1021,7 @@ function App() {
         <main className="main">
           <header className="topbar">
             <div className="mobile-brand">ELSEWHR</div>
-            <div className="online-pill"><span className="status-dot" /> {onlineCount} people online</div>
+            <div className="online-pill"><span className="status-dot" /> {siteOnlineCount} people online</div>
             <div className="top-actions">
               <button onClick={() => setShowPlus(true)}><Icon name="sparkles" size={14} /> Get Plus</button>
               <button className="avatar-button" onClick={() => setShowProfile(true)}>{initials(profile || { username: isAnonymous ? "guest" : authUser.email })}</button>
@@ -1017,7 +1046,7 @@ function App() {
                 </div>
                 <div className="hero-grid">
                   <div><strong>{discoverPeople.length}</strong><span>discoverable members</span></div>
-                  <div><strong>{onlineCount}</strong><span>online now</span></div>
+                  <div><strong>{siteOnlineCount}</strong><span>on ELSEWHR now</span></div>
                   <div><strong>{messageRooms.length}</strong><span>your live conversations</span></div>
                 </div>
               </section>
