@@ -604,9 +604,18 @@ function App() {
         </div>
       )}
 
-      {!authUser && authChecked && !showWelcome && (
+      {!authChecked || (!authUser && !showWelcome) && (
         <div className="auth-gate" role="dialog" aria-modal="true" aria-labelledby="auth-gate-title">
           <div className="auth-gate-inner">
+            {!authChecked ? (
+              <>
+                <div className="auth-gate-logo"><span className="brand-mark">E</span><strong>ELSEWHR</strong></div>
+                <span className="eyebrow">ELSEWHR</span>
+                <h1>Getting you there.</h1>
+                <p>Connecting your session before you enter.</p>
+              </>
+            ) : (
+              <>
             <div className="auth-gate-logo"><span className="brand-mark">E</span><strong>ELSEWHR</strong></div>
             <span className="eyebrow">{authMode === "signup" ? "JOIN ELSEWHR" : "WELCOME BACK"}</span>
             <h1 id="auth-gate-title">{authMode === "signup" ? "Go somewhere else." : "The internet is bigger than your circle."}</h1>
@@ -619,8 +628,10 @@ function App() {
               <button className="primary full" disabled={authBusy}>{authBusy ? "WORKING..." : authMode === "signin" ? "SIGN IN" : "CREATE ACCOUNT"}</button>
             </form>
             <div className="auth-or"><span>OR</span></div>
-            <button className="secondary full anonymous-entry" onClick={handleAnonymous} disabled={authBusy}><Icon name="incognito" size={15} /> CONTINUE ANONYMOUSLY</button>
+            <button className="secondary full anonymous-entry" onClick={handleAnonymous} disabled={authBusy}><Icon name="ghost" size={15} /> CONTINUE ANONYMOUSLY</button>
             <small className="auth-footnote">Anonymous access creates a temporary account. You can create a permanent account later.</small>
+              </>
+            )}
           </div>
         </div>
       )}
