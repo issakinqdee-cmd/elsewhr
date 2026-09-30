@@ -1138,6 +1138,8 @@ function App() {
                     activeRoom={activeRoom}
                     activeOther={activeOther}
                     activeConnection={activeConnection}
+                    isPlus={isPlus}
+                    onShowPlus={() => setShowPlus(true)}
                     activeMessages={activeMessages}
                     authUser={authUser}
                     message={message}
@@ -1409,6 +1411,8 @@ function App() {
                     activeRoom={activeRoom}
                     activeOther={activeOther}
                     activeConnection={activeConnection}
+                    isPlus={isPlus}
+                    onShowPlus={() => setShowPlus(true)}
                     activeMessages={activeMessages}
                     authUser={authUser}
                     message={message}
@@ -1774,10 +1778,106 @@ function GameModal({ game, setGame, rpsChoice, rpsResult, onRps, reactionScore, 
   );
 }
 
+
+function TogetherGamePicker({ games, isPlus, onClose, onSelect, onShowPlus }) {
+  return (
+    <div className="together-overlay" onMouseDown={onClose}>
+      <div className="together-picker" onMouseDown={event => event.stopPropagation()}>
+        <div className="together-picker-glow glow-one" />
+        <div className="together-picker-glow glow-two" />
+        <div className="together-picker-top">
+          <div>
+            <span className="eyebrow">PLAY TOGETHER</span>
+            <h3>Do something else.</h3>
+            <p>Pick a game and send it straight into this conversation.</p>
+          </div>
+          <button className="together-close" onClick={onClose} aria-label="Close"><Icon name="x" size={15} /></button>
+        </div>
+        <div className="together-game-grid">
+          {games.map((item, index) => (
+            <button key={item.id} className={"together-game-card " + (item.premium ? "premium" : "free")} style={{ "--delay": (index * 45) + "ms" }} onClick={() => item.premium && !isPlus ? onShowPlus?.() : onSelect(item)}>
+              <span className="together-card-icon"><Icon name={item.icon} size={18} /></span>
+              <span className="together-card-copy"><strong>{item.title}</strong><small>{item.desc}</small></span>
+              <span className="together-card-badge">{item.premium ? "PLUS" : "FREE"}</span>
+            </button>
+          ))}
+        </div>
+        <div className="together-picker-footer">
+          <span><Icon name="radio" size={12} /> Live over this chat</span>
+          {!isPlus && <button onClick={onShowPlus}>13 MORE WITH PLUS</button>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TogetherGameOverlay({ game, activeOther, authUser, ttt, rps, reactionDuel, onTttMove, onRpsMove, onStartReaction, onHitReaction, onClose }) {
+  const mark = game.id === "ttt" ? (ttt.starterId === authUser.id ? "X" : "O") : "";
+  return (
+    <div className="together-overlay game-layer" onMouseDown={onClose}>
+      <div className="together-arena" onMouseDown={event => event.stopPropagation()}>
+        <div className="together-arena-top">
+          <div className="versus-line">
+            <span className="versus-avatar mine">{initials({ display_name: "Y" })}</span>
+            <span className="versus-pulse" />
+            <span className="versus-title">{game.title}</span>
+            <span className="versus-pulse" />
+            <span className="versus-avatar them">{initials(activeOther || { display_name: "E" })}</span>
+          </div>
+          <button className="together-close" onClick={onClose} aria-label="Close"><Icon name="x" size={15} /></button>
+        </div>
+
+        {game.id === "ttt" && (
+          <div className="together-play-stage">
+            <div className="together-status">{ttt.winner === "draw" ? "DRAW" : ttt.winner ? (ttt.winner === authUser.id ? "YOU WIN" : "THEY WIN") : ttt.turn === authUser.id ? "YOUR TURN" : "THEIR TURN"}</div>
+            <div className="duel-board">
+              {ttt.board.map((cell, index) => (
+                <button key={index} className={"duel-cell " + (cell ? "filled " + cell.toLowerCase() : "")} onClick={() => onTttMove(index)}>{cell}</button>
+              ))}
+            </div>
+            <small>{mark ? "You are " + mark + "." : "Waiting for the game to start."}</small>
+          </div>
+        )}
+
+        {game.id === "rps" && (
+          <div className="together-play-stage">
+            <div className="together-status">{rps.result || (rps.self ? "Waiting for them..." : "Choose your move.")}</div>
+            <div className="rps-kinetic">
+              {["rock","paper","scissors"].map(choice => (
+                <button key={choice} className={rps.self === choice ? "chosen" : ""} disabled={Boolean(rps.self)} onClick={() => onRpsMove(choice)}>
+                  <span>{choice === "rock" ? "✊" : choice === "paper" ? "✋" : "✌️"}</span>
+                  <small>{choice}</small>
+                </button>
+              ))}
+            </div>
+            {rps.opponent && <div className="game-result">They played <strong>{rps.opponent}</strong>.</div>}
+          </div>
+        )}
+
+        {game.id === "reaction" && (
+          <div className="together-play-stage">
+            <div className="together-status">{reactionDuel.status === "live" ? "GO!" : reactionDuel.self !== null ? "RESULT LOCKED" : "Ready?"}</div>
+            <button className={"duel-reaction-target " + (reactionDuel.status === "live" ? "live" : "")} onClick={reactionDuel.status === "live" ? onHitReaction : undefined}>
+              {reactionDuel.status === "live" ? "TAP" : reactionDuel.self !== null ? reactionDuel.self + " ms" : "WAIT"}
+            </button>
+            <button className="secondary" onClick={onStartReaction}>{reactionDuel.self !== null || reactionDuel.opponent !== null ? "REMATCH" : "START DUEL"}</button>
+            <div className="reaction-score-row">
+              <span>You <strong>{reactionDuel.self === null ? "—" : reactionDuel.self + " ms"}</strong></span>
+              <span>{activeOther?.display_name || "Them"} <strong>{reactionDuel.opponent === null ? "—" : reactionDuel.opponent + " ms"}</strong></span>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function LiveChat({
   activeRoom,
   activeOther,
   activeConnection,
+  isPlus,
+  onShowPlus,
   activeMessages,
   authUser,
   message,
@@ -1804,6 +1904,248 @@ function LiveChat({
 }) {
   const reactionChoices = ["❤️", "😂", "🔥", "😍", "😮", "👍"];
   const byId = new Map(activeMessages.map(item => [item.id, item]));
+  const gameChannelRef = useRef(null);
+  const reactionTimerRef = useRef(null);
+  const [showTogetherGames, setShowTogetherGames] = useState(false);
+  const [togetherGame, setTogetherGame] = useState(null);
+  const [incomingInvite, setIncomingInvite] = useState(null);
+  const [ttt, setTtt] = useState({ board: Array(9).fill(""), turn: null, starterId: null, winner: null });
+  const [rps, setRps] = useState({ self: null, opponent: null, opponentName: "", result: "" });
+  const [reactionDuel, setReactionDuel] = useState({ status: "idle", start: 0, self: null, opponent: null, opponentName: "" });
+
+  const togetherGames = [
+    { id:"ttt", title:"Tic Tac Toe", desc:"Take the square. Own the row.", icon:"grid-3x3", premium:false },
+    { id:"rps", title:"Rock Paper Scissors", desc:"Read them. Throw first.", icon:"hand-rock", premium:false },
+    { id:"reaction", title:"Reaction Duel", desc:"Race their reflexes.", icon:"zap", premium:false },
+    { id:"chess", title:"Chess", desc:"Classic strategy, together.", icon:"crown", premium:true },
+    { id:"checkers", title:"Checkers", desc:"Fast board battles.", icon:"circle-dot", premium:true },
+    { id:"connect4", title:"Connect Four", desc:"Four in a row.", icon:"columns-3", premium:true },
+    { id:"memory", title:"Memory Match", desc:"Flip. Remember. Match.", icon:"brain", premium:true },
+    { id:"2048", title:"2048", desc:"Build the biggest tile.", icon:"hash", premium:true },
+    { id:"snake", title:"Snake", desc:"Grow without crashing.", icon:"move", premium:true },
+    { id:"minesweeper", title:"Minesweeper", desc:"Clear it clean.", icon:"bomb", premium:true },
+    { id:"scramble", title:"Word Scramble", desc:"Beat the clock.", icon:"text-cursor-input", premium:true },
+    { id:"hangman", title:"Hangman", desc:"Find the hidden word.", icon:"circle-help", premium:true },
+    { id:"sudoku", title:"Sudoku", desc:"Fill every square.", icon:"table-2", premium:true },
+    { id:"battleship", title:"Battleship", desc:"Find their fleet.", icon:"ship-wheel", premium:true },
+    { id:"darts", title:"Darts", desc:"Chase the bullseye.", icon:"target", premium:true },
+    { id:"higher", title:"Higher or Lower", desc:"Call the next card.", icon:"arrow-up-down", premium:true },
+  ];
+
+  function sendTogether(payload) {
+    gameChannelRef.current?.send({
+      type: "broadcast",
+      event: "together_game",
+      payload: { ...payload, from: authUser.id },
+    }).catch(() => {});
+  }
+
+  function resetTogetherState(gameId, starterId = null) {
+    if (gameId === "ttt") {
+      setTtt({ board: Array(9).fill(""), turn: starterId, starterId, winner: null });
+    }
+    if (gameId === "rps") {
+      setRps({ self: null, opponent: null, opponentName: "", result: "" });
+    }
+    if (gameId === "reaction") {
+      if (reactionTimerRef.current) window.clearTimeout(reactionTimerRef.current);
+      setReactionDuel({ status: "waiting", start: 0, self: null, opponent: null, opponentName: "" });
+    }
+  }
+
+  function beginTogetherGame(gameItem, invite = false) {
+    if (gameItem.premium && !isPlus) {
+      onShowPlus?.();
+      return;
+    }
+    setShowTogetherGames(false);
+    setTogetherGame(gameItem);
+    setIncomingInvite(null);
+    if (invite) return;
+
+    if (gameItem.id === "ttt" || gameItem.id === "rps") {
+      resetTogetherState(gameItem.id, authUser.id);
+      sendTogether({
+        kind: "invite",
+        gameId: gameItem.id,
+        fromName: authUser.user_metadata?.display_name || authUser.user_metadata?.username || "Someone",
+      });
+    } else if (gameItem.id === "reaction") {
+      resetTogetherState("reaction");
+      sendTogether({
+        kind: "invite",
+        gameId: "reaction",
+        fromName: authUser.user_metadata?.display_name || authUser.user_metadata?.username || "Someone",
+      });
+    }
+  }
+
+  function acceptTogetherInvite() {
+    if (!incomingInvite) return;
+    const item = togetherGames.find(candidate => candidate.id === incomingInvite.gameId);
+    if (!item) return;
+    if (item.premium && !isPlus) {
+      onShowPlus?.();
+      return;
+    }
+    setTogetherGame(item);
+    setIncomingInvite(null);
+    resetTogetherState(item.id, incomingInvite.from);
+    sendTogether({
+      kind: "start",
+      gameId: item.id,
+      starterId: incomingInvite.from,
+      starterName: incomingInvite.fromName || "Player",
+    });
+  }
+
+  function declineTogetherInvite() {
+    sendTogether({ kind: "decline", gameId: incomingInvite?.gameId });
+    setIncomingInvite(null);
+  }
+
+  function closeTogetherGame() {
+    if (togetherGame) sendTogether({ kind: "close", gameId: togetherGame.id });
+    if (reactionTimerRef.current) window.clearTimeout(reactionTimerRef.current);
+    setTogetherGame(null);
+    setShowTogetherGames(false);
+    setIncomingInvite(null);
+    setTtt({ board: Array(9).fill(""), turn: null, starterId: null, winner: null });
+    setRps({ self: null, opponent: null, opponentName: "", result: "" });
+    setReactionDuel({ status: "idle", start: 0, self: null, opponent: null, opponentName: "" });
+  }
+
+  function playTttTogether(index) {
+    if (!togetherGame || togetherGame.id !== "ttt" || ttt.winner || ttt.turn !== authUser.id || ttt.board[index]) return;
+    const mark = ttt.starterId === authUser.id ? "X" : "O";
+    const next = [...ttt.board];
+    next[index] = mark;
+    const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+    const winningLine = wins.find(([a,b,c]) => next[a] && next[a] === next[b] && next[a] === next[c]);
+    const winner = winningLine ? authUser.id : next.every(Boolean) ? "draw" : null;
+    const nextTurn = winner ? null : (ttt.turn === activeOther?.id ? authUser.id : activeOther?.id);
+    const nextState = { board: next, turn: nextTurn, starterId: ttt.starterId, winner };
+    setTtt(nextState);
+    sendTogether({ kind: "ttt_move", state: nextState });
+  }
+
+  function playRpsTogether(choice) {
+    if (!togetherGame || togetherGame.id !== "rps" || rps.self) return;
+    const next = { ...rps, self: choice };
+    setRps(next);
+    sendTogether({ kind: "rps_move", choice });
+  }
+
+  function startReactionDuel() {
+    if (!togetherGame || togetherGame.id !== "reaction") return;
+    const startDelay = 1900;
+    resetTogetherState("reaction");
+    sendTogether({
+      kind: "reaction_start",
+      delay: startDelay,
+      fromName: authUser.user_metadata?.display_name || authUser.user_metadata?.username || "Someone",
+    });
+    reactionTimerRef.current = window.setTimeout(() => {
+      setReactionDuel(current => ({ ...current, status: "live", start: performance.now() }));
+    }, startDelay);
+  }
+
+  function hitReactionDuel() {
+    if (reactionDuel.status !== "live" || reactionDuel.self !== null) return;
+    const score = Math.max(0, Math.round(performance.now() - reactionDuel.start));
+    const next = { ...reactionDuel, self: score, status: "done" };
+    setReactionDuel(next);
+    sendTogether({ kind: "reaction_score", score });
+  }
+
+  useEffect(() => {
+    if (!supabase || !activeRoom?.id || activeRoom.kind === "group" || !authUser?.id) return;
+    const channel = supabase.channel("elsewhr-together-" + activeRoom.id);
+    gameChannelRef.current = channel;
+
+    channel
+      .on("broadcast", { event: "together_game" }, ({ payload }) => {
+        if (!payload || payload.from === authUser.id) return;
+
+        if (payload.kind === "invite") {
+          const item = togetherGames.find(candidate => candidate.id === payload.gameId);
+          if (item) setIncomingInvite({ ...payload, item });
+          return;
+        }
+
+        if (payload.kind === "decline") {
+          setTogetherGame(null);
+          setIncomingInvite(null);
+          return;
+        }
+
+        if (payload.kind === "start") {
+          const item = togetherGames.find(candidate => candidate.id === payload.gameId);
+          if (!item) return;
+          setTogetherGame(item);
+          setIncomingInvite(null);
+          resetTogetherState(item.id, payload.starterId || payload.from);
+          if (item.id === "reaction") {
+            const delay = Number(payload.delay) || 1900;
+            resetTogetherState("reaction");
+            if (reactionTimerRef.current) window.clearTimeout(reactionTimerRef.current);
+            reactionTimerRef.current = window.setTimeout(() => {
+              setReactionDuel(current => ({ ...current, status: "live", start: performance.now() }));
+            }, delay);
+          }
+          return;
+        }
+
+        if (payload.kind === "ttt_move") {
+          setTtt(payload.state);
+          return;
+        }
+
+        if (payload.kind === "rps_move") {
+          setRps(current => {
+            const next = { ...current, opponent: payload.choice, opponentName: payload.fromName || "Opponent" };
+            if (next.self) {
+              const won = (next.self === "rock" && payload.choice === "scissors") || (next.self === "paper" && payload.choice === "rock") || (next.self === "scissors" && payload.choice === "paper");
+              next.result = next.self === payload.choice ? "DRAW" : won ? "YOU WIN" : "YOU LOSE";
+            }
+            return next;
+          });
+          return;
+        }
+
+        if (payload.kind === "reaction_start") {
+          if (reactionTimerRef.current) window.clearTimeout(reactionTimerRef.current);
+          const delay = Number(payload.delay) || 1900;
+          setReactionDuel({ status: "waiting", start: 0, self: null, opponent: null, opponentName: payload.fromName || "Opponent" });
+          reactionTimerRef.current = window.setTimeout(() => {
+            setReactionDuel(current => ({ ...current, status: "live", start: performance.now() }));
+          }, delay);
+          return;
+        }
+
+        if (payload.kind === "reaction_score") {
+          setReactionDuel(current => ({ ...current, opponent: payload.score, opponentName: payload.fromName || "Opponent" }));
+          return;
+        }
+
+        if (payload.kind === "close") {
+          setTogetherGame(null);
+          setIncomingInvite(null);
+          if (reactionTimerRef.current) window.clearTimeout(reactionTimerRef.current);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      if (reactionTimerRef.current) window.clearTimeout(reactionTimerRef.current);
+      gameChannelRef.current = null;
+      supabase.removeChannel(channel);
+    };
+  }, [activeRoom?.id, authUser?.id]);
+
+  useEffect(() => () => {
+    if (reactionTimerRef.current) window.clearTimeout(reactionTimerRef.current);
+  }, []);
 
   return (
     <section className="chat-page live-chat">
@@ -1818,6 +2160,11 @@ function LiveChat({
           </div>
         </div>
         <div className="chat-header-actions">
+          {activeRoom.kind !== "group" && (
+            <button className="chat-play-button" aria-label="Play together" onClick={() => setShowTogetherGames(true)}>
+              <Icon name="gamepad-2" size={14} /> PLAY
+            </button>
+          )}
           {onSkip && (
             <button className="chat-skip" aria-label="Skip this chat" onClick={onSkip}>
               <Icon name="skip-forward" size={14} /> SKIP
@@ -1839,6 +2186,46 @@ function LiveChat({
           )}
         </div>
       </div>
+
+      {incomingInvite && (
+        <div className="game-invite-pop">
+          <div className="game-invite-orb"><Icon name={incomingInvite.item?.icon || "gamepad-2"} size={18} /></div>
+          <div className="game-invite-copy">
+            <span>GAME INVITE</span>
+            <strong>{incomingInvite.fromName || "Someone"} wants to play {incomingInvite.item?.title || "together"}.</strong>
+          </div>
+          <div className="game-invite-actions">
+            <button className="primary" onClick={acceptTogetherInvite}>PLAY</button>
+            <button className="secondary" onClick={declineTogetherInvite}>NOT NOW</button>
+          </div>
+        </div>
+      )}
+
+      {showTogetherGames && !togetherGame && (
+        <TogetherGamePicker
+          games={togetherGames}
+          isPlus={isPlus}
+          onClose={() => setShowTogetherGames(false)}
+          onSelect={beginTogetherGame}
+          onShowPlus={onShowPlus}
+        />
+      )}
+
+      {togetherGame && (
+        <TogetherGameOverlay
+          game={togetherGame}
+          activeOther={activeOther}
+          authUser={authUser}
+          ttt={ttt}
+          rps={rps}
+          reactionDuel={reactionDuel}
+          onTttMove={playTttTogether}
+          onRpsMove={playRpsTogether}
+          onStartReaction={startReactionDuel}
+          onHitReaction={hitReactionDuel}
+          onClose={closeTogetherGame}
+        />
+      )}
 
       <div className="chat-body">
         <div className="chat-intro">
