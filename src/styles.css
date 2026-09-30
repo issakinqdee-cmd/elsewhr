@@ -174,7 +174,7 @@ button{border:0;cursor:pointer}
 .report-options button .ui-icon{filter:none!important}
 @media(max-width:900px){
   body{padding-bottom:72px}
-  .mobile-nav{position:fixed;display:grid;grid-template-columns:repeat(5,1fr);left:10px;right:10px;bottom:10px;height:60px;background:rgba(15,15,15,.94);border:1px solid rgba(255,255,255,.1);border-radius:18px;backdrop-filter:blur(20px);z-index:45;box-shadow:0 18px 50px rgba(0,0,0,.45)}
+  .mobile-nav{position:fixed;display:grid;grid-template-columns:repeat(6,1fr);left:10px;right:10px;bottom:10px;height:60px;background:rgba(15,15,15,.94);border:1px solid rgba(255,255,255,.1);border-radius:18px;backdrop-filter:blur(20px);z-index:45;box-shadow:0 18px 50px rgba(0,0,0,.45)}
   .mobile-nav button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:transparent;color:#77786f;font-size:8px;letter-spacing:.02em}
   .mobile-nav button.active{color:#8b5cf6}
   .mobile-nav .ui-icon{width:17px;height:17px}
@@ -714,3 +714,44 @@ body{
 .auth-gate-logo .brand-mark{border-radius:11px}
 .welcome-logo .brand-mark{border-radius:18px;box-shadow:0 18px 55px rgba(139,92,246,.22)}
 .hero-page h1 span{background:var(--spectrum-gradient);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+/* ELSEWHR arcade */
+.games-page{max-width:1180px;margin:0 auto;padding:50px 5vw 80px}
+.games-heading{margin-bottom:18px}
+.games-heading h2{max-width:720px}
+.games-count{display:flex;align-items:baseline;gap:7px;border:1px solid rgba(255,255,255,.08);background:rgba(139,92,246,.06);border-radius:999px;padding:9px 13px;color:#9b9c95}
+.games-count strong{font:700 18px "Space Grotesk",sans-serif;color:#f5f5f1}
+.games-count span{font-size:8px;letter-spacing:.12em}
+.games-count i{color:#ff6b9a;font-style:normal;margin:0 2px}
+.games-intro{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:14px 16px;margin-bottom:20px;border:1px solid rgba(255,255,255,.08);border-radius:16px;background:linear-gradient(100deg,rgba(139,92,246,.07),rgba(255,255,255,.02))}
+.games-intro p{margin:0;color:#969790;font-size:12px}
+.games-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.game-card{min-height:220px;border:1px solid rgba(255,255,255,.08);border-radius:20px;padding:16px;background:#0c0d13;display:flex;flex-direction:column;justify-content:space-between;transition:.18s ease}
+.game-card:hover{transform:translateY(-4px);border-color:rgba(139,92,246,.28);box-shadow:0 20px 50px rgba(0,0,0,.22)}
+.game-card h3{font:700 19px/1.05 "Space Grotesk",sans-serif;margin:18px 0 8px;letter-spacing:-.03em}
+.game-card p{font-size:11px;line-height:1.55;color:#7f817a;margin:0 0 16px}
+.game-card-top{display:flex;align-items:center;justify-content:space-between}
+.game-icon{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;background:rgba(139,92,246,.1);color:#c4b5fd;border:1px solid rgba(139,92,246,.15)}
+.game-free,.game-lock{font-size:8px;font-weight:700;letter-spacing:.1em;border-radius:999px;padding:6px 8px}
+.game-free{color:#8ff7e6;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.15)}
+.game-lock{color:#ffb4c7;background:rgba(255,95,122,.08);border:1px solid rgba(255,95,122,.15)}
+.premium-game{background:linear-gradient(155deg,rgba(255,95,122,.035),rgba(139,92,246,.045)),#0c0d13}
+.game-card .primary,.game-card .secondary{width:100%;margin-top:auto}
+.game-modal{width:min(620px,100%);text-align:center}
+.game-panel{display:grid;gap:16px;margin-top:18px}
+.game-panel>p{color:#85867f;font-size:12px;margin:0}
+.rps-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.rps-grid button{padding:15px 10px;border-radius:12px;background:#12131b;color:#ddd;border:1px solid rgba(255,255,255,.08);font-size:10px;font-weight:700}
+.rps-grid button.selected{background:#8b5cf6;color:#0a0714;border-color:transparent}
+.game-result{padding:11px 12px;border-radius:12px;background:rgba(34,211,238,.07);border:1px solid rgba(34,211,238,.12);color:#d9fbf5;font-size:11px}
+.reaction-target{height:170px;border-radius:24px;background:#12131b;color:#777;border:1px solid rgba(255,255,255,.08);font:700 24px "Space Grotesk",sans-serif}
+.reaction-target.live{background:#22d3ee;color:#071015;box-shadow:0 0 50px rgba(34,211,238,.25);cursor:pointer}
+.ttt-grid{width:min(320px,100%);margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.ttt-cell{aspect-ratio:1;background:#12131b;border:1px solid rgba(255,255,255,.08);border-radius:14px;color:#fff;font:700 32px "Space Grotesk",sans-serif}
+.ttt-cell.filled{background:rgba(139,92,246,.12);color:#ddd6fe}
+.placeholder-game{min-height:240px;display:grid;place-items:center;align-content:center;gap:9px;color:#b7b8b1}
+.placeholder-game strong{font:700 24px "Space Grotesk",sans-serif}
+.placeholder-game span{max-width:300px;color:#77786f;font-size:11px;line-height:1.5}
+@media(max-width:1050px){.games-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:760px){.games-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.games-intro{align-items:flex-start;flex-direction:column}}
+@media(max-width:520px){.games-grid{grid-template-columns:1fr}.games-page{padding-left:18px;padding-right:18px}.games-count{align-self:flex-start}}
