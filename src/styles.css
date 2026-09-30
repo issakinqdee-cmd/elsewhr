@@ -55,6 +55,16 @@ button{border:0;cursor:pointer}
 .chat-header-actions{display:flex;gap:7px}
 .chat-header-actions button,.chat-actions button{background:#111;color:#aaa;border:1px solid rgba(255,255,255,.09);padding:9px 12px;border-radius:11px;font-size:11px}
 .chat-header-actions button:hover,.chat-actions button:hover{color:#fff;background:#161616}
+.chat-header-actions .chat-skip{
+  color:#c4b5fd;
+  border-color:rgba(139,92,246,.28);
+  background:linear-gradient(135deg,rgba(139,92,246,.13),rgba(34,211,238,.07));
+}
+.chat-header-actions .chat-skip:hover{
+  color:#fff;
+  border-color:rgba(34,211,238,.38);
+  background:linear-gradient(135deg,rgba(139,92,246,.22),rgba(34,211,238,.12));
+}
 .chat-body{overflow:auto;padding:25px 7vw 10px;display:flex;flex-direction:column}
 .chat-intro{text-align:center;margin:3px auto 32px}
 .large-avatar{width:76px;height:76px;border-radius:24px;margin:0 auto 12px;font-size:24px}
