@@ -1,6 +1,9 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
+import { supabase, supabaseConfigured } from "./lib/supabase";
+import { getCurrentUser, saveProfile, signInWithEmail, signOut, signUpWithEmail, uploadAvatar } from "./lib/account";
+import { startPaypalSubscription } from "./lib/paypal";
 
 const discoverPeople = [
   { name: "Maya", age: 24, country: "South Africa", flag: "🇿🇦", vibe: "Music", tags: ["Music", "Movies", "Late Night"], bio: "Good conversations > small talk.", gradient: "linear-gradient(145deg,#f6c9b8,#6e4658)" },
@@ -32,7 +35,92 @@ function App() {
   const [liked, setLiked] = useState(false);
   const [message, setMessage] = useState("");
   const [sent, setSent] = useState([]);
+  const [authUser, setAuthUser] = useState(null);
+  const [authEmail, setAuthEmail] = useState("");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authMode, setAuthMode] = useState("signin");
+  const [authBusy, setAuthBusy] = useState(false);
+  const [profileFile, setProfileFile] = useState(null);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [accountError, setAccountError] = useState("");
+  const [paymentBusy, setPaymentBusy] = useState(false);
+  const [paymentError, setPaymentError] = useState("");
   const person = discoverPeople[discoverIndex % discoverPeople.length];
+
+  useEffect(() => {
+    if (!supabase) return;
+    getCurrentUser().then(setAuthUser).catch(() => setAuthUser(null));
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthUser(session?.user ?? null);
+    });
+    return () => data.subscription.unsubscribe();
+  }, []);
+
+  async function handleAuth(e) {
+    e.preventDefault();
+    setAuthBusy(true);
+    setAccountError("");
+    try {
+      const result = authMode === "signin"
+        ? await signInWithEmail(authEmail, authPassword)
+        : await signUpWithEmail(authEmail, authPassword);
+      setAuthUser(result.user ?? result.session?.user ?? null);
+      if (authMode === "signup" && !result.session) {
+        setAccountError("Check your email to confirm your ELSEWHR account, then sign in.");
+      }
+    } catch (error) {
+      setAccountError(error.message || "Authentication failed.");
+    } finally {
+      setAuthBusy(false);
+    }
+  }
+
+  async function handleProfileSave(e) {
+    e.preventDefault();
+    if (!authUser) return;
+    setProfileSaving(true);
+    setAccountError("");
+    try {
+      let photo = null;
+      if (profileFile) photo = await uploadAvatar(authUser.id, profileFile);
+      await saveProfile({
+        id: authUser.id,
+        username: authEmail.split("@")[0].replace(/[^a-zA-Z0-9_]/g, "").slice(0, 24) || "elsewhr_user",
+        display_name: document.getElementById("profile-display-name")?.value || null,
+        age: Number(document.getElementById("profile-age")?.value || 18),
+        country: document.getElementById("profile-country")?.value || null,
+        languages: ["English"],
+        interests: ["Music"],
+        bio: document.getElementById("profile-bio")?.value || null,
+        primary_photo_path: photo?.path ?? null,
+        primary_photo_url: photo?.publicUrl ?? null,
+        discoverable: Boolean(photo),
+      });
+      setShowProfile(false);
+    } catch (error) {
+      setAccountError(error.message || "Could not save your profile.");
+    } finally {
+      setProfileSaving(false);
+    }
+  }
+
+  async function handlePlusCheckout(plan = "monthly") {
+    if (!authUser) {
+      setShowProfile(true);
+      setShowPlus(false);
+      return;
+    }
+    setPaymentBusy(true);
+    setPaymentError("");
+    try {
+      const approvalUrl = await startPaypalSubscription(plan, authUser.access_token);
+      window.location.href = approvalUrl;
+    } catch (error) {
+      setPaymentError(error.message || "PayPal checkout could not start.");
+    } finally {
+      setPaymentBusy(false);
+    }
+  }
 
   const currentMessages = useMemo(() => [...messages, ...sent], [sent]);
 
@@ -248,22 +336,38 @@ function App() {
             <div className="modal-top"><span className="eyebrow">CREATE PROFILE</span><button onClick={() => setShowProfile(false)} aria-label="Close"><Icon name="x" size={16} /></button></div>
             <h2>Show people there's a real person here.</h2>
             <p className="modal-copy">A real primary photo helps us keep ELSEWHR human and reduces fake, explicit, and spam-heavy profiles.</p>
-            <div className="photo-upload">
-              <div className="upload-avatar"><Icon name="plus" size={21} /></div>
-              <div><strong>Add your picture</strong><span>Primary photo required for discovery</span></div>
-              <button>Upload</button>
-            </div>
-            <div className="profile-form-grid">
-              <label>Username<input defaultValue="Theo" /></label>
-              <label>Age<input defaultValue="24" /></label>
-              <label>Country<input defaultValue="Botswana" /></label>
-              <label>Language<input defaultValue="English" /></label>
-            </div>
-            <div className="verification-callout">
-              <span><Icon name="shield-check" size={18} /></span>
-              <div><strong>Verification</strong><p>ELSEWHR+ will include identity verification and verified-only discovery.</p></div>
-            </div>
-            <button className="primary full" onClick={() => setShowProfile(false)}>SAVE PROFILE</button>
+            {!supabaseConfigured && <div className="verification-callout"><span><Icon name="info" size={18} /></span><div><strong>Prototype mode</strong><p>Connect the Supabase environment to enable real accounts, profile storage and realtime features.</p></div></div>}
+            {supabaseConfigured && !authUser && (
+              <form onSubmit={handleAuth} className="auth-form">
+                <div className="auth-toggle"><button type="button" className={authMode === "signin" ? "selected" : ""} onClick={() => setAuthMode("signin")}>Sign in</button><button type="button" className={authMode === "signup" ? "selected" : ""} onClick={() => setAuthMode("signup")}>Create account</button></div>
+                <label>Email<input type="email" required value={authEmail} onChange={e => setAuthEmail(e.target.value)} placeholder="you@example.com" /></label>
+                <label>Password<input type="password" minLength={8} required value={authPassword} onChange={e => setAuthPassword(e.target.value)} placeholder="At least 8 characters" /></label>
+                {accountError && <div className="form-error">{accountError}</div>}
+                <button className="primary full" disabled={authBusy}>{authBusy ? "WORKING..." : authMode === "signin" ? "SIGN IN" : "CREATE ACCOUNT"}</button>
+              </form>
+            )}
+            {supabaseConfigured && authUser && (
+              <form onSubmit={handleProfileSave}>
+                <div className="photo-upload">
+                  <div className="upload-avatar"><Icon name="image-plus" size={21} /></div>
+                  <div><strong>Add your picture</strong><span>Primary photo required for discovery</span></div>
+                  <label className="upload-button">Choose<input type="file" accept="image/png,image/jpeg,image/webp" onChange={e => setProfileFile(e.target.files?.[0] ?? null)} hidden /></label>
+                </div>
+                <div className="profile-form-grid">
+                  <label>Display name<input id="profile-display-name" placeholder="Theo" /></label>
+                  <label>Age<input id="profile-age" type="number" min="18" placeholder="18+" /></label>
+                  <label>Country<input id="profile-country" placeholder="Botswana" /></label>
+                  <label>Language<input defaultValue="English" /></label>
+                </div>
+                <label className="profile-wide">Bio<textarea id="profile-bio" rows="3" placeholder="Tell people what you're into..." /></label>
+                {accountError && <div className="form-error">{accountError}</div>}
+                <div className="verification-callout">
+                  <span><Icon name="shield-check" size={18} /></span>
+                  <div><strong>Verification</strong><p>ELSEWHR+ will include identity verification and verified-only discovery.</p></div>
+                </div>
+                <div className="profile-buttons"><button className="primary" disabled={profileSaving}>{profileSaving ? "SAVING..." : "SAVE PROFILE"}</button><button type="button" className="secondary" onClick={() => signOut().then(() => setAuthUser(null))}>SIGN OUT</button></div>
+              </form>
+            )}
           </div>
         </div>
       )}
@@ -278,8 +382,8 @@ function App() {
             <div className="plus-grid">
               {["Identity verification","Advanced Discover filters","Unlimited Discover","Who liked you","Persistent images","HD video calls","Custom profiles","Premium themes","Saved conversations","Private rooms","Advanced stats","Ad-free"].map(item => <div key={item}><Icon name="check" size={13} /> {item}</div>)}
             </div>
-            <button className="paypal-button">Pay with PayPal</button>
-            <small className="trial-note">7-day trial · cancel anytime</small>
+            <button className="paypal-button" onClick={() => handlePlusCheckout("monthly")} disabled={paymentBusy}>{paymentBusy ? "OPENING PAYPAL..." : "Pay with PayPal"}</button>
+            <small className="trial-note">7-day trial · cancel anytime</small>{paymentError && <div className="form-error">{paymentError}</div>}
           </div>
         </div>
       )}
