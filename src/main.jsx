@@ -135,6 +135,9 @@ function App() {
   const messageRooms = rooms.filter(room => room.kind === "direct" || room.kind === "random");
   const groupRooms = rooms.filter(room => room.kind === "group");
   const activeOther = activeRoom?.members?.find(member => member.user_id !== authUser?.id)?.profile ?? null;
+  const activeConnection = activeOther
+    ? connections.find(connection => connection.person?.id === activeOther.id)
+    : null;
 
   function goSocial(nextPage) {
     if (!authUser) return;
@@ -885,10 +888,11 @@ function App() {
                     <p>Your queue is live. A room appears here the moment another eligible member matches with you.</p>
                     <button className="secondary" onClick={stopRandomMatch}>LEAVE QUEUE</button>
                   </div>
-                ) : activeRoom?.kind === "random" ? (
+                ) : activeRoom ? (
                   <LiveChat
                     activeRoom={activeRoom}
                     activeOther={activeOther}
+                    activeConnection={activeConnection}
                     activeMessages={activeMessages}
                     authUser={authUser}
                     message={message}
@@ -897,6 +901,7 @@ function App() {
                     replyToMessage={replyToMessage}
                     openMessageActionsId={openMessageActionsId}
                     openReactionId={openReactionId}
+                    onConnect={handleConnect}
                     onSend={handleSendMessage}
                     onStartReply={startReply}
                     onStartEdit={startEdit}
@@ -1288,6 +1293,7 @@ function App() {
 function LiveChat({
   activeRoom,
   activeOther,
+  activeConnection,
   activeMessages,
   authUser,
   message,
@@ -1296,6 +1302,7 @@ function LiveChat({
   replyToMessage,
   openMessageActionsId,
   openReactionId,
+  onConnect,
   onSend,
   onStartReply,
   onStartEdit,
@@ -1326,6 +1333,17 @@ function LiveChat({
           </div>
         </div>
         <div className="chat-header-actions">
+          {activeRoom.kind === "random" && activeOther && (
+            <button
+              className={activeConnection?.status === "accepted" ? "chat-connect accepted" : "chat-connect"}
+              aria-label={activeConnection?.status === "accepted" ? "Friends" : "Add friend"}
+              onClick={() => onConnect?.(activeOther)}
+              disabled={activeConnection?.status === "accepted"}
+            >
+              <Icon name={activeConnection?.status === "accepted" ? "heart" : "user-plus"} size={14} />
+              {activeConnection?.status === "accepted" ? "FRIENDS" : activeConnection?.status === "pending" && activeConnection?.direction === "incoming" ? "ACCEPT" : "ADD FRIEND"}
+            </button>
+          )}
           <button aria-label="More options" onClick={onMenu}><Icon name="ellipsis" size={16} /></button>
         </div>
       </div>
