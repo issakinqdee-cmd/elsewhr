@@ -434,3 +434,12 @@ button{border:0;cursor:pointer}
   .conversation-sidebar{min-height:calc(100vh - 180px)}
   .conversation-stage{min-height:calc(100vh - 180px)}
 }
+
+
+.chat-header-actions .chat-connect{background:#c8ff52;color:#0d0e09;border-color:transparent;font-size:9px;font-weight:900;letter-spacing:.05em;padding:9px 11px}
+.chat-header-actions .chat-connect:hover{background:#d2ff75;color:#080900}
+.chat-header-actions .chat-connect.accepted{background:rgba(200,255,82,.08);color:#c8ff52;border-color:rgba(200,255,82,.2)}
+.chat-header-actions .chat-connect:disabled{opacity:1;cursor:default}
+@media(max-width:620px){
+  .chat-header-actions .chat-connect{display:inline-flex!important;padding:8px 9px;font-size:8px}
+}
