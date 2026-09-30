@@ -1551,6 +1551,7 @@ function App() {
                             openMessageActionsId={openMessageActionsId}
                             openReactionId={openReactionId}
                             onConnect={handleConnect}
+                            onViewProfile={person => setViewedProfile(person)}
                             onSend={handleSendMessage}
                             onSendAttachment={handleSendAttachment}
                             attachmentBusy={attachmentBusy}
@@ -1639,6 +1640,7 @@ function App() {
                     openMessageActionsId={openMessageActionsId}
                     openReactionId={openReactionId}
                     onConnect={handleConnect}
+                    onViewProfile={person => setViewedProfile(person)}
                     onSend={handleSendMessage}
                     onSendAttachment={handleSendAttachment}
                     attachmentBusy={attachmentBusy}
