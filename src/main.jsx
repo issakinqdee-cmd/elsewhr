@@ -9,6 +9,12 @@ const discoverPeople = [
   { name: "Kabelo", age: 23, country: "Botswana", flag: "🇧🇼", vibe: "Chill", tags: ["Basketball", "Music", "Memes"], bio: "Here for the random conversations.", gradient: "linear-gradient(145deg,#9ad6bd,#2d4c45)" }
 ];
 
+
+const ICON_BASE = "https://api.iconify.design/lucide:";
+function Icon({ name, size = 18, alt = "" }) {
+  return <img className="ui-icon" src={`${ICON_BASE}${name}.png?color=%23c8ff52&width=${size}&height=${size}`} width={size} height={size} alt={alt} aria-hidden={!alt} />;
+}
+
 const messages = [
   { side: "them", text: "yo", time: "19:41" },
   { side: "me", text: "hey 😂", time: "19:42" },
@@ -31,13 +37,13 @@ function App() {
   const currentMessages = useMemo(() => [...messages, ...sent], [sent]);
 
   const nav = [
-    ["home", "⌂", "Home"],
-    ["random", "⚡", "Random"],
-    ["discover", "⌁", "Discover"],
-    ["connections", "♡", "Connections"],
-    ["messages", "◌", "Messages"],
-    ["rooms", "◫", "Rooms"],
-    ["games", "◇", "Games"]
+    ["home", "house", "Home"],
+    ["random", "zap", "Random"],
+    ["discover", "compass", "Discover"],
+    ["connections", "heart", "Connections"],
+    ["messages", "message-circle", "Messages"],
+    ["rooms", "panels-top-left", "Rooms"],
+    ["games", "gamepad-2", "Games"]
   ];
 
   function nextPerson() {
@@ -66,7 +72,7 @@ function App() {
           <span className="side-label">EXPLORE</span>
           {nav.map(([key, icon, label]) => (
             <button key={key} className={`nav-item ${page === key ? "active" : ""}`} onClick={() => setPage(key)}>
-              <span>{icon}</span><span>{label}</span>
+              <span className="nav-icon"><Icon name={icon} /></span><span>{label}</span>
             </button>
           ))}
         </div>
@@ -74,7 +80,7 @@ function App() {
         <div className="side-section">
           <span className="side-label">NEXT</span>
           <button className="genesis-nav" onClick={() => setShowGenesis(true)}>
-            <span>✦</span>
+            <span className="nav-icon"><Icon name="sparkles" /></span>
             <span>
               <strong>GENESIS</strong>
               <small>Coming soon</small>
@@ -83,8 +89,8 @@ function App() {
         </div>
 
         <div className="sidebar-bottom">
-          <button className="nav-item" onClick={() => setShowProfile(true)}><span>◉</span><span>Profile</span></button>
-          <button className="nav-item" onClick={() => setShowPlus(true)}><span>✧</span><span>ELSEWHR+</span></button>
+          <button className="nav-item" onClick={() => setShowProfile(true)}><span className="nav-icon"><Icon name="user-circle-2" /></span><span>Profile</span></button>
+          <button className="nav-item" onClick={() => setShowPlus(true)}><span className="nav-icon"><Icon name="sparkles" /></span><span>ELSEWHR+</span></button>
         </div>
       </aside>
 
@@ -93,7 +99,7 @@ function App() {
           <div className="mobile-brand">ELSEWHR</div>
           <div className="online-pill"><span className="status-dot" /> 8,491 elsewhere right now</div>
           <div className="top-actions">
-            <button onClick={() => setShowPlus(true)}>+ Get Plus</button>
+            <button onClick={() => setShowPlus(true)}><Icon name="sparkles" size={14} /> Get Plus</button>
             <button className="avatar-button" onClick={() => setShowProfile(true)}>T</button>
           </div>
         </header>
@@ -105,13 +111,13 @@ function App() {
               <h1>Someone,<br /><span>somewhere,</span><br />is waiting.</h1>
               <p>Meet people outside your usual world. Talk, discover, connect, and decide what happens next.</p>
               <div className="hero-actions">
-                <button className="primary large" onClick={() => setPage("random")}>GO ELSEWHR <span>↗</span></button>
+                <button className="primary large" onClick={() => setPage("random")}>GO ELSEWHR <Icon name="arrow-up-right" size={16} /></button>
                 <button className="secondary large" onClick={() => setPage("discover")}>DISCOVER PEOPLE</button>
               </div>
               <div className="hero-grid">
                 <div><strong>1 → 1</strong><span>Instant private chat</span></div>
-                <div><strong>🌍</strong><span>People anywhere</span></div>
-                <div><strong>∞</strong><span>Go somewhere else</span></div>
+                <div><strong><Icon name="globe-2" size={20} /></strong><span>People anywhere</span></div>
+                <div><strong><Icon name="infinity" size={20} /></strong><span>Go somewhere else</span></div>
               </div>
             </section>
           )}
@@ -124,9 +130,9 @@ function App() {
                   <div><strong>{person.name}_482</strong><span><i /> {person.country}</span></div>
                 </div>
                 <div className="chat-header-actions">
-                  <button onClick={() => setShowCall("voice")}>☎ Voice</button>
-                  <button onClick={() => setShowCall("video")}>▣ Video</button>
-                  <button>⋯</button>
+                  <button onClick={() => setShowCall("voice")}><Icon name="phone" size={14} /> Voice</button>
+                  <button onClick={() => setShowCall("video")}><Icon name="video" size={14} /> Video</button>
+                  <button aria-label="More options"><Icon name="ellipsis" size={16} /></button>
                 </div>
               </div>
 
@@ -149,18 +155,18 @@ function App() {
               </div>
 
               <form className="composer" onSubmit={sendMessage}>
-                <button type="button">☺</button>
-                <button type="button" title="Images">▣</button>
-                <button type="button" title="Voice note">◉</button>
+                <button type="button" aria-label="Emoji"><Icon name="smile" size={17} /></button>
+                <button type="button" title="Images"><Icon name="image" size={17} /></button>
+                <button type="button" title="Voice note"><Icon name="mic" size={17} /></button>
                 <input value={message} onChange={e => setMessage(e.target.value)} placeholder="Message..." />
-                <button className="send" type="submit">➤</button>
+                <button className="send" aria-label="Send" type="submit"><Icon name="send" size={16} /></button>
               </form>
 
               <div className="chat-actions">
-                <button className="next-button" onClick={nextPerson}>↻ NEXT</button>
-                <button className={liked ? "liked" : ""} onClick={() => setLiked(v => !v)}>♡ {liked ? "SAVED" : "SAVE"}</button>
-                <button>🚩 REPORT</button>
-                <button>LEAVE</button>
+                <button className="next-button" onClick={nextPerson}><Icon name="refresh-cw" size={15} /> NEXT</button>
+                <button className={liked ? "liked" : ""} onClick={() => setLiked(v => !v)}><Icon name="heart" size={15} /> {liked ? "SAVED" : "SAVE"}</button>
+                <button><Icon name="flag" size={15} /> REPORT</button>
+                <button><Icon name="log-out" size={15} /> LEAVE</button>
               </div>
             </section>
           )}
@@ -169,12 +175,12 @@ function App() {
             <section className="discover-page">
               <div className="section-heading">
                 <div><span className="eyebrow">DISCOVER</span><h2>Choose your elsewhere.</h2></div>
-                <button className="secondary" onClick={() => setShowPlus(true)}>Unlock more filters ✧</button>
+                <button className="secondary" onClick={() => setShowPlus(true)}>Unlock more filters <Icon name="sparkles" size={14} /></button>
               </div>
               <div className="discover-layout">
                 <div className="profile-card">
                   <div className="profile-photo" style={{background: person.gradient}}>
-                    <div className="verified-placeholder">✓</div>
+                    <div className="verified-placeholder"><Icon name="badge-check" size={17} /></div>
                     <div className="photo-caption">{person.name}</div>
                   </div>
                   <div className="profile-info">
@@ -183,9 +189,9 @@ function App() {
                     <p>{person.bio}</p>
                     <div className="tags">{person.tags.map(tag => <span key={tag}>{tag}</span>)}</div>
                     <div className="swipe-actions">
-                      <button className="round-button pass" onClick={nextPerson}>×</button>
-                      <button className="round-button super" onClick={() => setShowPlus(true)}>✦</button>
-                      <button className="round-button connect" onClick={() => { setLiked(true); setPage("connections"); }}>♡</button>
+                      <button className="round-button pass" onClick={nextPerson} aria-label="Pass"><Icon name="x" size={22} /></button>
+                      <button className="round-button super" onClick={() => setShowPlus(true)} aria-label="Super connect"><Icon name="sparkles" size={20} /></button>
+                      <button className="round-button connect" onClick={() => { setLiked(true); setPage("connections"); }} aria-label="Connect"><Icon name="heart" size={21} /></button>
                     </div>
                   </div>
                 </div>
@@ -196,7 +202,7 @@ function App() {
                     <label><input type="checkbox" /> Verified</label>
                     <label><input type="checkbox" /> Music</label>
                     <label><input type="checkbox" /> Gaming</label>
-                    <button className="filter-plus" onClick={() => setShowPlus(true)}>Advanced filters are a Plus feature →</button>
+                    <button className="filter-plus" onClick={() => setShowPlus(true)}>Advanced filters are a Plus feature <Icon name="arrow-up-right" size={13} /></button>
                   </div>
                   <div className="quote-card">
                     <span>ELSEWHR THOUGHT</span>
@@ -239,11 +245,11 @@ function App() {
       {showProfile && (
         <div className="modal-backdrop" onMouseDown={() => setShowProfile(false)}>
           <div className="modal profile-modal" onMouseDown={e => e.stopPropagation()}>
-            <div className="modal-top"><span className="eyebrow">CREATE PROFILE</span><button onClick={() => setShowProfile(false)}>×</button></div>
+            <div className="modal-top"><span className="eyebrow">CREATE PROFILE</span><button onClick={() => setShowProfile(false)} aria-label="Close"><Icon name="x" size={16} /></button></div>
             <h2>Show people there's a real person here.</h2>
             <p className="modal-copy">A real primary photo helps us keep ELSEWHR human and reduces fake, explicit, and spam-heavy profiles.</p>
             <div className="photo-upload">
-              <div className="upload-avatar">+</div>
+              <div className="upload-avatar"><Icon name="plus" size={21} /></div>
               <div><strong>Add your picture</strong><span>Primary photo required for discovery</span></div>
               <button>Upload</button>
             </div>
@@ -254,7 +260,7 @@ function App() {
               <label>Language<input defaultValue="English" /></label>
             </div>
             <div className="verification-callout">
-              <span>✓</span>
+              <span><Icon name="shield-check" size={18} /></span>
               <div><strong>Verification</strong><p>ELSEWHR+ will include identity verification and verified-only discovery.</p></div>
             </div>
             <button className="primary full" onClick={() => setShowProfile(false)}>SAVE PROFILE</button>
@@ -265,12 +271,12 @@ function App() {
       {showPlus && (
         <div className="modal-backdrop" onMouseDown={() => setShowPlus(false)}>
           <div className="modal plus-modal" onMouseDown={e => e.stopPropagation()}>
-            <div className="modal-top"><span className="plus-badge">ELSEWHR+</span><button onClick={() => setShowPlus(false)}>×</button></div>
+            <div className="modal-top"><span className="plus-badge"><Icon name="sparkles" size={12} /> ELSEWHR+</span><button onClick={() => setShowPlus(false)} aria-label="Close"><Icon name="x" size={16} /></button></div>
             <h2>Make ELSEWHR yours.</h2>
             <p className="modal-copy">More control over who you meet, how you appear, and how you stay connected.</p>
             <div className="price-row"><strong>$1.99</strong><span>/ month · $19.99 / year</span></div>
             <div className="plus-grid">
-              {["Identity verification","Advanced Discover filters","Unlimited Discover","Who liked you","Persistent images","HD video calls","Custom profiles","Premium themes","Saved conversations","Private rooms","Advanced stats","Ad-free"].map(item => <div key={item}>✓ {item}</div>)}
+              {["Identity verification","Advanced Discover filters","Unlimited Discover","Who liked you","Persistent images","HD video calls","Custom profiles","Premium themes","Saved conversations","Private rooms","Advanced stats","Ad-free"].map(item => <div key={item}><Icon name="check" size={13} /> {item}</div>)}
             </div>
             <button className="paypal-button">Pay with PayPal</button>
             <small className="trial-note">7-day trial · cancel anytime</small>
@@ -281,11 +287,11 @@ function App() {
       {showGenesis && (
         <div className="modal-backdrop" onMouseDown={() => setShowGenesis(false)}>
           <div className="modal genesis-modal" onMouseDown={e => e.stopPropagation()}>
-            <div className="genesis-symbol">✦</div>
+            <div className="genesis-symbol"><Icon name="sparkles" size={24} /></div>
             <span className="eyebrow">GENESIS</span>
             <h2>A different kind of connection is coming.</h2>
             <p className="modal-copy">A future private space for deeper connections. For now, Genesis stays intentionally quiet.</p>
-            <button className="primary full" onClick={() => setShowGenesis(false)}>BACK TO ELSEWHR</button>
+            <button className="primary full" onClick={() => setShowGenesis(false)}><Icon name="arrow-left" size={15} /> BACK TO ELSEWHR</button>
           </div>
         </div>
       )}
@@ -299,7 +305,7 @@ function App() {
               {showCall === "video" && <div className="self-preview">YOU</div>}
             </div>
             <div className="call-controls">
-              <button>◉</button><button>⌁</button><button className="end-call" onClick={() => setShowCall(null)}>☎</button>
+              <button aria-label="Mute"><Icon name="mic-off" size={18} /></button><button aria-label="Camera"><Icon name="video" size={18} /></button><button className="end-call" onClick={() => setShowCall(null)} aria-label="End call"><Icon name="phone-off" size={18} /></button>
             </div>
           </div>
         </div>
