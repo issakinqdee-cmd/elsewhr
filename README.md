@@ -36,3 +36,7 @@ Primary profile photos are required for public/discoverable profiles. Media mode
 
 npm install
 npm run dev
+
+### UI icons
+
+The interface no longer uses emoji glyphs for navigation or controls. It uses monochrome PNG icons from the Lucide icon set via Iconify's PNG endpoint, keeping the visual language consistent across platforms. Lucide's current project site describes the icon set as clean and consistent and lists the ISC License.
