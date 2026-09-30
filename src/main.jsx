@@ -121,6 +121,7 @@ function App() {
   const [discoverOnlineOnly, setDiscoverOnlineOnly] = useState(false);
   const [discoverVerifiedOnly, setDiscoverVerifiedOnly] = useState(false);
   const [discoverIndex, setDiscoverIndex] = useState(0);
+  const [viewedProfile, setViewedProfile] = useState(null);
 
   const [isMatching, setIsMatching] = useState(false);
   const [matchingSince, setMatchingSince] = useState(null);
@@ -223,6 +224,10 @@ function App() {
   const currentDiscoverPerson = visiblePeople.length
     ? visiblePeople[discoverIndex % visiblePeople.length]
     : null;
+
+  useEffect(() => {
+    setDiscoverIndex(0);
+  }, [discoverOnlineOnly, discoverVerifiedOnly]);
 
   const messageRooms = rooms.filter(room => room.kind === "direct");
   const groupRooms = rooms.filter(room => room.kind === "group");
@@ -1383,18 +1388,26 @@ function App() {
                 {currentDiscoverPerson ? (
                   <div className="discover-layout">
                     <div className="profile-card">
-                      <div className="profile-photo real-photo" style={currentDiscoverPerson.primary_photo_url ? { backgroundImage: "url(" + currentDiscoverPerson.primary_photo_url + ")" } : undefined}>
+                      <button
+                        type="button"
+                        className="profile-photo real-photo discover-profile-trigger"
+                        onClick={() => setViewedProfile(currentDiscoverPerson)}
+                        aria-label={"View " + personName(currentDiscoverPerson) + "'s profile"}
+                        style={currentDiscoverPerson.primary_photo_url ? { backgroundImage: "url(" + currentDiscoverPerson.primary_photo_url + ")" } : undefined}
+                      >
                         {!currentDiscoverPerson.primary_photo_url && <div className="photo-fallback">{initials(currentDiscoverPerson)}</div>}
                         {currentDiscoverPerson.verified_at && <div className="verified-placeholder"><Icon name="badge-check" size={17} /></div>}
                         <div className="live-photo-meta">
                           <strong>{personName(currentDiscoverPerson)}</strong>
                           <span><i className={currentDiscoverPerson.online ? "online-dot" : "offline-dot"} /> {currentDiscoverPerson.online ? "Online now" : "Offline"}</span>
                         </div>
-                      </div>
+                      </button>
                       <div className="profile-info">
-                        <div className="name-line">
-                          <h3>{personName(currentDiscoverPerson)}{currentDiscoverPerson.age ? ", " + currentDiscoverPerson.age : ""}</h3>
-                        </div>
+                        <button type="button" className="discover-name-button" onClick={() => setViewedProfile(currentDiscoverPerson)}>
+                          <div className="name-line">
+                            <h3>{personName(currentDiscoverPerson)}{currentDiscoverPerson.age ? ", " + currentDiscoverPerson.age : ""}</h3>
+                          </div>
+                        </button>
                         <span className="country-line">{currentDiscoverPerson.country || "Location not shared"}</span>
                         {currentDiscoverPerson.bio && <p>{currentDiscoverPerson.bio}</p>}
                         <div className="tags">
@@ -1712,6 +1725,61 @@ function App() {
           onStartReaction={startReactionGame}
           onHitReaction={hitReaction}
         />
+      )}
+
+      {viewedProfile && (
+        <div className="modal-backdrop profile-view-backdrop" onMouseDown={() => setViewedProfile(null)}>
+          <div className="modal viewed-profile-modal" onMouseDown={event => event.stopPropagation()}>
+            <div className="modal-top">
+              <span className="eyebrow">PROFILE</span>
+              <button onClick={() => setViewedProfile(null)} aria-label="Close"><Icon name="x" size={16} /></button>
+            </div>
+            <div className="viewed-profile-hero">
+              <div
+                className="viewed-profile-photo"
+                style={viewedProfile.primary_photo_url ? { backgroundImage: "url(" + viewedProfile.primary_photo_url + ")" } : undefined}
+              >
+                {!viewedProfile.primary_photo_url && <div className="photo-fallback">{initials(viewedProfile)}</div>}
+                {viewedProfile.verified_at && <span className="viewed-profile-verified"><Icon name="badge-check" size={14} /></span>}
+                <span className="viewed-profile-status"><i className={viewedProfile.online ? "online-dot" : "offline-dot"} /> {viewedProfile.online ? "ONLINE NOW" : "RECENTLY ACTIVE"}</span>
+              </div>
+              <div className="viewed-profile-identity">
+                <span className="eyebrow">{viewedProfile.username ? "@" + viewedProfile.username : "ELSEWHR MEMBER"}</span>
+                <h2>{personName(viewedProfile)}{viewedProfile.age ? ", " + viewedProfile.age : ""}</h2>
+                <span>{viewedProfile.country || "Location not shared"}</span>
+              </div>
+            </div>
+            <div className="viewed-profile-scroll">
+              {viewedProfile.bio && (
+                <div className="viewed-profile-section">
+                  <span className="eyebrow">ABOUT</span>
+                  <p>{viewedProfile.bio}</p>
+                </div>
+              )}
+              <div className="viewed-profile-section">
+                <span className="eyebrow">INTERESTS</span>
+                <div className="tags viewed-profile-tags">
+                  {(viewedProfile.interests || []).length ? viewedProfile.interests.map(tag => <span key={tag}>{tag}</span>) : <span>No interests added yet.</span>}
+                </div>
+              </div>
+              <div className="viewed-profile-details">
+                <div><Icon name="languages" size={15} /><span><small>Languages</small><strong>{(viewedProfile.languages || ["Not shared"]).join(", ")}</strong></span></div>
+                <div><Icon name="clock-3" size={15} /><span><small>Profile updated</small><strong>{timeLabel(viewedProfile.updated_at) || "Recently"}</strong></span></div>
+              </div>
+            </div>
+            <div className="viewed-profile-actions">
+              <button className="secondary" onClick={() => { setViewedProfile(null); setDiscoverIndex(value => value + 1); }}>
+                <Icon name="x" size={15} /> NEXT
+              </button>
+              <button className="secondary" onClick={() => { setViewedProfile(null); openConnection(viewedProfile); }}>
+                <Icon name="message-circle" size={15} /> MESSAGE
+              </button>
+              <button className="primary" onClick={() => { setViewedProfile(null); handleConnect(viewedProfile); }}>
+                <Icon name="heart" size={15} /> CONNECT
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {showProfile && (
