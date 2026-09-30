@@ -642,3 +642,21 @@ button{border:0;cursor:pointer}
   border-color:rgba(155,130,255,.24)!important;
 }
 .reaction-chip.mine{color:#d7ff72!important;background:rgba(99,247,218,.07)!important}
+
+
+/* Spectrum atmosphere */
+body{
+  background:
+    radial-gradient(circle at 4% 0%,rgba(99,247,218,.055),transparent 24%),
+    radial-gradient(circle at 96% 8%,rgba(155,130,255,.06),transparent 25%),
+    radial-gradient(circle at 72% 100%,rgba(255,130,200,.045),transparent 25%),
+    #080808;
+}
+.top-signup{background:var(--spectrum-gradient)!important;color:#090a09!important}
+.status-dot{background:linear-gradient(135deg,var(--spectrum-b),var(--spectrum-c))!important;box-shadow:0 0 13px rgba(155,130,255,.42)!important}
+.guest-badge{color:var(--spectrum-b)!important;border-color:rgba(99,247,218,.25)!important}
+.matching-count{background:var(--spectrum-gradient);-webkit-background-clip:text;background-clip:text;color:transparent}
+.matching-orbit{border-color:rgba(155,130,255,.18)}
+.matching-orbit span,.matching-orbit i,.matching-orbit b{background:var(--spectrum-b);box-shadow:0 0 16px rgba(99,247,218,.45)}
+.eyebrow{background:var(--spectrum-gradient);-webkit-background-clip:text;background-clip:text;color:transparent}
+.plus-badge{background:var(--spectrum-gradient-soft)!important;color:#fff!important;border-color:rgba(155,130,255,.18)!important}
