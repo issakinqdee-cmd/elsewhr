@@ -283,3 +283,10 @@ button{border:0;cursor:pointer}
   .guest-actions{grid-template-columns:1fr}
   .guest-actions .danger-button{grid-column:auto}
 }
+
+
+/* Auth interaction fix */
+.splash-screen{pointer-events:none!important}
+.auth-gate{z-index:999!important;pointer-events:auto!important}
+.auth-gate *{pointer-events:auto}
+.locked-shell{pointer-events:none!important}
