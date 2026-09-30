@@ -143,9 +143,9 @@ function App() {
 
   function goSocial(nextPage) {
     if (!authUser) return;
-    if (!isAnonymous && !profileReady) {
+    if (!isAnonymous && !profileReady && nextPage === "random") {
       setShowProfile(true);
-      setToast("Finish your profile and add a primary photo first.");
+      setToast("Three quick things and you can start Random.");
       return;
     }
     navigateTo(nextPage);
@@ -252,6 +252,11 @@ function App() {
 
   async function openConnection(person) {
     if (!person?.id) return;
+    if (!isAnonymous && !profileReady) {
+      setShowProfile(true);
+      setToast("Add a photo, name and age first. You can skip the extras.");
+      return;
+    }
     setDataBusy(true);
     try {
       const roomId = await findOrCreateDirectRoom(person.id);
@@ -514,6 +519,11 @@ function App() {
 
   async function handleConnect(person) {
     if (!authUser || !person?.id) return;
+    if (!isAnonymous && !profileReady) {
+      setShowProfile(true);
+      setToast("Add a photo, name and age first. You can skip the extras.");
+      return;
+    }
     try {
       const result = await connectToUser(authUser.id, person.id);
       await refreshAll();
