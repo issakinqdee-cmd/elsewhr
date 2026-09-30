@@ -93,11 +93,10 @@ returns jsonb
 language plpgsql
 security definer
 set search_path = public
-as $$
+as $
 declare
   me uuid := auth.uid();
   requester uuid;
-  target uuid;
   saved_room uuid;
 begin
   if me is null then raise exception 'Not authenticated'; end if;
@@ -111,11 +110,17 @@ begin
 
   if requester is null then raise exception 'Connection request not found'; end if;
 
-  target := requester;
-  update public.connections set status = 'accepted' where id = connection_id;
+  update public.connections
+  set status = 'accepted'
+  where id = connection_id
+     or (
+       requester_id = me
+       and receiver_id = requester
+       and status = 'pending'
+     );
 
   perform pg_advisory_xact_lock(hashtextextended(
-    least(me::text, target::text) || ':' || greatest(me::text, target::text), 0
+    least(me::text, requester::text) || ':' || greatest(me::text, requester::text), 0
   ));
 
   select r.id into saved_room
@@ -128,14 +133,15 @@ begin
     )
     and exists (
       select 1 from public.room_members rm
-      where rm.room_id = r.id and rm.user_id = target and rm.left_at is null
+      where rm.room_id = r.id and rm.user_id = requester and rm.left_at is null
     )
   order by r.created_at desc
   limit 1
   for update;
 
   if saved_room is not null then
-    update public.rooms set kind = 'direct', title = null, description = null
+    update public.rooms
+    set kind = 'direct', title = null, description = null
     where id = saved_room;
   end if;
 
@@ -145,7 +151,7 @@ begin
     'room_id', saved_room
   );
 end;
-$$;
+$;
 
 revoke execute on function public.connect_or_accept_user(uuid) from public, anon;
 grant execute on function public.connect_or_accept_user(uuid) to authenticated;
