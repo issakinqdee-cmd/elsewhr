@@ -176,7 +176,7 @@ export async function listMessages(roomId, currentUserId) {
   const client = await requireSupabase();
   const { data: messages, error: messageError } = await client
     .from("messages")
-    .select("id, room_id, sender_id, body, media_type, created_at, edited_at, deleted_at, reply_to_id")
+    .select("id, room_id, sender_id, body, media_type, media_path, media_name, media_size, created_at, edited_at, deleted_at, reply_to_id")
     .eq("room_id", roomId)
     .order("created_at", { ascending: true })
     .limit(500);
@@ -193,6 +193,12 @@ export async function listMessages(roomId, currentUserId) {
   if (hiddenResult.error) throw hiddenResult.error;
 
   const hiddenIds = new Set((hiddenResult.data ?? []).map(row => row.message_id));
+  const mediaPaths = (messages ?? []).map(row => row.media_path).filter(Boolean);
+  let mediaUrls = new Map();
+  if (mediaPaths.length) {
+    const { data: signed } = await client.storage.from("attachments").createSignedUrls(mediaPaths, 60 * 60);
+    mediaUrls = new Map((signed ?? []).map(row => [row.path, row.signedUrl]));
+  }
   const reactionMap = new Map();
   (reactionResult.data ?? []).forEach(row => {
     if (!reactionMap.has(row.message_id)) reactionMap.set(row.message_id, []);
@@ -203,8 +209,48 @@ export async function listMessages(roomId, currentUserId) {
     .filter(message => !hiddenIds.has(message.id))
     .map(message => ({
       ...message,
+      media_url: message.media_path ? (mediaUrls.get(message.media_path) || null) : null,
       reactions: reactionMap.get(message.id) ?? [],
     }));
+}
+
+export async function uploadRoomAttachment(roomId, senderId, file, caption = null, replyToId = null) {
+  const client = await requireSupabase();
+  if (!roomId || !senderId || !file) throw new Error("Choose a file first.");
+  if (file.size > 25 * 1024 * 1024) throw new Error("Attachments must be 25 MB or smaller.");
+
+  const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "_").slice(-120) || "attachment";
+  const path = `${roomId}/${senderId}/${crypto.randomUUID()}-${safeName}`;
+  const { error: uploadError } = await client.storage.from("attachments").upload(path, file, {
+    cacheControl: "3600",
+    upsert: false,
+    contentType: file.type || "application/octet-stream",
+  });
+  if (uploadError) throw uploadError;
+
+  try {
+    const { data, error } = await client
+      .from("messages")
+      .insert({
+        room_id: roomId,
+        sender_id: senderId,
+        body: caption?.trim() || null,
+        media_type: file.type || "application/octet-stream",
+        media_path: path,
+        media_name: file.name,
+        media_size: file.size,
+        reply_to_id: replyToId || null,
+      })
+      .select("id, room_id, sender_id, body, media_type, media_path, media_name, media_size, created_at, edited_at, deleted_at, reply_to_id")
+      .single();
+    if (error) throw error;
+
+    const { data: signed } = await client.storage.from("attachments").createSignedUrl(path, 60 * 60);
+    return { ...data, media_url: signed?.signedUrl || null, reactions: [] };
+  } catch (error) {
+    await client.storage.from("attachments").remove([path]).catch(() => {});
+    throw error;
+  }
 }
 
 export async function sendTextMessage(roomId, senderId, body, replyToId = null) {
@@ -217,7 +263,7 @@ export async function sendTextMessage(roomId, senderId, body, replyToId = null) 
       body: body.trim(),
       reply_to_id: replyToId || null,
     })
-    .select("id, room_id, sender_id, body, media_type, created_at, edited_at, deleted_at, reply_to_id")
+    .select("id, room_id, sender_id, body, media_type, media_path, media_name, media_size, created_at, edited_at, deleted_at, reply_to_id")
     .single();
   if (error) throw error;
   return data;
@@ -260,6 +306,8 @@ export async function deleteMessageForEveryone(messageId, senderId) {
       body: null,
       media_type: null,
       media_path: null,
+      media_name: null,
+      media_size: null,
       edited_at: null,
       deleted_at: new Date().toISOString(),
     })
