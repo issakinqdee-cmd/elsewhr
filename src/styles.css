@@ -216,3 +216,35 @@ button{border:0;cursor:pointer}
   .call-note{max-width:85%;text-align:center;white-space:normal}
   .toast{bottom:82px;max-width:88%;text-align:center}
 }
+
+
+/* ELSEWHR welcome animation + visible auth entry */
+.ghost{background:transparent;border:1px solid rgba(255,255,255,.1);color:#aaa;border-radius:15px;padding:15px 19px;font-weight:700;font-size:12px;letter-spacing:.04em}
+.ghost:hover{color:#fff;background:#111;border-color:rgba(255,255,255,.16)}
+.top-signin{background:transparent!important;color:#aaa!important;border:1px solid rgba(255,255,255,.09)!important;border-radius:999px!important;padding:9px 13px!important;font-size:11px!important}
+.top-signup{background:#c8ff52!important;color:#10110b!important;border:0!important;border-radius:999px!important;padding:9px 14px!important;font-size:11px!important;font-weight:800!important}
+.welcome-screen{position:fixed;inset:0;z-index:200;background:#080808;display:grid;place-items:center;align-content:center;gap:14px;animation:welcomeOut .55s 1.85s cubic-bezier(.7,0,.2,1) forwards}
+.welcome-bubble{position:relative;width:94px;height:94px;border-radius:30px;display:grid;place-items:center;background:radial-gradient(circle at 35% 25%,rgba(200,255,82,.28),rgba(200,255,82,.04) 50%,rgba(255,255,255,.02));border:1px solid rgba(200,255,82,.2);box-shadow:0 0 60px rgba(200,255,82,.08);animation:welcomeFloat 1.45s ease-in-out both}
+.welcome-logo{font:800 34px/1 "Space Grotesk",sans-serif;color:#c8ff52;letter-spacing:-.08em;animation:welcomeLogo .85s .25s cubic-bezier(.2,.8,.2,1) both}
+.welcome-dot{position:absolute;width:8px;height:8px;border-radius:50%;background:#c8ff52;box-shadow:0 0 18px rgba(200,255,82,.5)}
+.dot-a{top:10px;left:18px;animation:welcomeDotA 2s ease-in-out infinite}
+.dot-b{top:17px;right:13px;animation:welcomeDotB 2.4s ease-in-out infinite}
+.dot-c{bottom:12px;left:29px;animation:welcomeDotC 1.8s ease-in-out infinite}
+.welcome-wordmark{font:800 17px/1 "Space Grotesk",sans-serif;letter-spacing:.16em;color:#f5f5f1;opacity:0;animation:welcomeText .7s .35s ease forwards}
+.welcome-tag{font-size:9px;letter-spacing:.18em;color:#72736c;opacity:0;animation:welcomeText .7s .55s ease forwards}
+@keyframes welcomeFloat{0%{opacity:0;transform:translateY(18px) scale(.78) rotate(-7deg)}60%{opacity:1;transform:translateY(-4px) scale(1.04) rotate(2deg)}100%{opacity:1;transform:translateY(0) scale(1) rotate(0)}}
+@keyframes welcomeLogo{0%{opacity:0;transform:scale(.55) rotate(-8deg)}70%{opacity:1;transform:scale(1.08) rotate(2deg)}100%{opacity:1;transform:scale(1) rotate(0)}}
+@keyframes welcomeText{to{opacity:1;transform:translateY(0)}from{opacity:0;transform:translateY(8px)}}
+@keyframes welcomeDotA{50%{transform:translate(5px,6px) scale(.75)}}
+@keyframes welcomeDotB{50%{transform:translate(-5px,8px) scale(1.15)}}
+@keyframes welcomeDotC{50%{transform:translate(7px,-5px) scale(.85)}}
+@keyframes welcomeOut{to{opacity:0;visibility:hidden;pointer-events:none}}
+@media (prefers-reduced-motion:reduce){
+  .welcome-screen{animation:none;opacity:0;visibility:hidden;pointer-events:none}
+  .welcome-bubble,.welcome-logo,.welcome-wordmark,.welcome-tag,.welcome-dot{animation:none!important}
+}
+@media(max-width:620px){
+  .top-signin{display:none}
+  .top-signup{padding:8px 11px!important}
+  .hero-actions .ghost{width:100%}
+}
