@@ -349,6 +349,32 @@ function App() {
     matchingSinceRef.current = null;
   }
 
+  async function handleRandomSkip() {
+    const room = activeRoomRef.current || activeRoom;
+    if (!authUser) return;
+
+    setDataError("");
+    setMessage("");
+    setReplyToMessage(null);
+    setEditingMessageId(null);
+    setOpenMessageActionsId(null);
+    setOpenReactionId(null);
+    setCurrentRoom(null);
+    setActiveMessages([]);
+
+    if (room?.kind === "random") {
+      try {
+        await leaveRoom(room.id, authUser.id);
+      } catch (error) {
+        setDataError(error.message || "That chat could not be skipped.");
+        return;
+      }
+    }
+
+    await refreshAll();
+    await startRandomMatch();
+  }
+
   async function handleAuth(event) {
     event.preventDefault();
     setAuthBusy(true);
@@ -1038,6 +1064,7 @@ function App() {
                     }}
                     onReport={() => setShowReport(true)}
                     onMenu={() => setShowChatMenu(value => !value)}
+                    onSkip={handleRandomSkip}
                     onLeave={handleLeaveRoom}
                   />
                 ) : (
@@ -1507,6 +1534,7 @@ function LiveChat({
   onToggleReactionPicker,
   onReport,
   onMenu,
+  onSkip,
   onLeave,
 }) {
   const reactionChoices = ["❤️", "😂", "🔥", "😍", "😮", "👍"];
@@ -1525,6 +1553,11 @@ function LiveChat({
           </div>
         </div>
         <div className="chat-header-actions">
+          {onSkip && (
+            <button className="chat-skip" aria-label="Skip this chat" onClick={onSkip}>
+              <Icon name="skip-forward" size={14} /> SKIP
+            </button>
+          )}
           {activeRoom.kind === "random" && activeOther && (
             <button
               className={activeConnection?.status === "accepted" ? "chat-connect accepted" : "chat-connect"}
