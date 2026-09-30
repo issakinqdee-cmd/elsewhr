@@ -300,6 +300,16 @@ export async function deleteMessageForMe(messageId, userId) {
 
 export async function deleteMessageForEveryone(messageId, senderId) {
   const client = await requireSupabase();
+  const { data: existing, error: lookupError } = await client
+    .from("messages")
+    .select("id, room_id, sender_id, media_path")
+    .eq("id", messageId)
+    .eq("sender_id", senderId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (lookupError) throw lookupError;
+  if (!existing) throw new Error("That message can no longer be deleted.");
+
   const { data, error } = await client
     .from("messages")
     .update({
@@ -314,9 +324,13 @@ export async function deleteMessageForEveryone(messageId, senderId) {
     .eq("id", messageId)
     .eq("sender_id", senderId)
     .is("deleted_at", null)
-    .select("id, room_id, sender_id, body, media_type, created_at, edited_at, deleted_at, reply_to_id")
+    .select("id, room_id, sender_id, body, media_type, media_path, media_name, media_size, created_at, edited_at, deleted_at, reply_to_id")
     .single();
   if (error) throw error;
+
+  if (existing.media_path) {
+    await client.storage.from("attachments").remove([existing.media_path]).catch(() => {});
+  }
   return data;
 }
 
