@@ -1946,7 +1946,12 @@ function TogetherGamePicker({ games, isPlus, onClose, onSelect, onShowPlus }) {
             <h3>Do something else.</h3>
             <p>Pick a game and send it straight into this conversation.</p>
           </div>
-          <button className="together-close" onClick={onClose} aria-label="Close"><Icon name="x" size={15} /></button>
+          <div className="together-arena-controls">
+            <button className="together-minimize" onClick={onMinimize} aria-label="Minimize game" title="Minimize">
+              <Icon name="minus" size={15} />
+            </button>
+            <button className="together-close" onClick={onClose} aria-label="End game" title="End game"><Icon name="x" size={15} /></button>
+          </div>
         </div>
         <div className="together-game-grid">
           {games.map((item, index) => (
@@ -1966,7 +1971,7 @@ function TogetherGamePicker({ games, isPlus, onClose, onSelect, onShowPlus }) {
   );
 }
 
-function TogetherGameOverlay({ game, activeOther, authUser, ttt, rps, reactionDuel, onTttMove, onRpsMove, onStartReaction, onHitReaction, onClose }) {
+function TogetherGameOverlay({ game, activeOther, authUser, ttt, rps, reactionDuel, onTttMove, onRpsMove, onStartReaction, onHitReaction, onMinimize, onClose }) {
   const mark = game.id === "ttt" ? (ttt.starterId === authUser.id ? "X" : "O") : "";
   return (
     <div className="together-overlay game-layer" onMouseDown={onClose}>
@@ -2088,6 +2093,7 @@ function LiveChat({
   const reactionTimerRef = useRef(null);
   const [showTogetherGames, setShowTogetherGames] = useState(false);
   const [togetherGame, setTogetherGame] = useState(null);
+  const [togetherMinimized, setTogetherMinimized] = useState(false);
   const [incomingInvite, setIncomingInvite] = useState(null);
   const [ttt, setTtt] = useState({ board: Array(9).fill(""), turn: null, starterId: null, winner: null });
   const [rps, setRps] = useState({ self: null, opponent: null, opponentName: "", result: "" });
@@ -2141,6 +2147,7 @@ function LiveChat({
     }
     setShowTogetherGames(false);
     setTogetherGame(gameItem);
+    setTogetherMinimized(false);
     setIncomingInvite(null);
     setTogetherOpponentId(activeRoom.kind === "group" ? null : (activeOther?.id || null));
     if (invite) return;
@@ -2187,6 +2194,7 @@ function LiveChat({
       return;
     }
     setTogetherGame(item);
+    setTogetherMinimized(false);
     setIncomingInvite(null);
     setTogetherOpponentId(incomingInvite.from);
     resetTogetherState(item.id, incomingInvite.from);
@@ -2224,6 +2232,7 @@ function LiveChat({
     if (togetherGame) sendTogether({ kind: "close", gameId: togetherGame.id });
     if (reactionTimerRef.current) window.clearTimeout(reactionTimerRef.current);
     setTogetherGame(null);
+    setTogetherMinimized(false);
     setShowTogetherGames(false);
     setIncomingInvite(null);
     setTogetherOpponentId(null);
@@ -2313,6 +2322,7 @@ function LiveChat({
           const peerId = participants.find(id => id !== authUser.id) || payload.from || null;
           setTogetherOpponentId(peerId);
           setTogetherGame(item);
+          setTogetherMinimized(false);
           setIncomingInvite(null);
           resetTogetherState(item.id, payload.starterId || payload.from);
           if (item.id === "reaction") {
@@ -2360,6 +2370,7 @@ function LiveChat({
 
         if (payload.kind === "close") {
           setTogetherGame(null);
+          setTogetherMinimized(false);
           setIncomingInvite(null);
           setTogetherOpponentId(null);
           if (reactionTimerRef.current) window.clearTimeout(reactionTimerRef.current);
@@ -2440,7 +2451,19 @@ function LiveChat({
         />
       )}
 
-      {togetherGame && (
+      {togetherGame && togetherMinimized && (
+        <button className="minimized-game-dock" onClick={() => setTogetherMinimized(false)} aria-label={"Restore " + togetherGame.title}>
+          <span className="minimized-game-icon"><Icon name={togetherGame.icon || "gamepad-2"} size={15} /></span>
+          <span className="minimized-game-copy">
+            <strong>{togetherGame.title}</strong>
+            <small>GAME IN PROGRESS</small>
+          </span>
+          <span className="minimized-game-live"><i /> LIVE</span>
+          <Icon name="chevron-up" size={15} />
+        </button>
+      )}
+
+      {togetherGame && !togetherMinimized && (
         <TogetherGameOverlay
           game={togetherGame}
           activeOther={activeOther}
@@ -2452,6 +2475,7 @@ function LiveChat({
           onRpsMove={playRpsTogether}
           onStartReaction={startReactionDuel}
           onHitReaction={hitReactionDuel}
+          onMinimize={() => setTogetherMinimized(true)}
           onClose={closeTogetherGame}
         />
       )}
