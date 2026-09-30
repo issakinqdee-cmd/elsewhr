@@ -51,6 +51,8 @@ function App() {
   const [paymentBusy, setPaymentBusy] = useState(false);
   const [paymentError, setPaymentError] = useState("");
   const [showReport, setShowReport] = useState(false);
+  const [isMatching, setIsMatching] = useState(false);
+  const [matchSeconds, setMatchSeconds] = useState(0);
   const person = discoverPeople[discoverIndex % discoverPeople.length];
 
   function navigateTo(nextPage) {
@@ -69,6 +71,26 @@ function App() {
     });
     return () => data.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!isMatching) return;
+    setMatchSeconds(5);
+    const timer = window.setInterval(() => {
+      setMatchSeconds(seconds => {
+        if (seconds <= 1) {
+          window.clearInterval(timer);
+          setDiscoverIndex(index => index + 1);
+          setLiked(false);
+          setSent([]);
+          setMessage("");
+          setIsMatching(false);
+          return 0;
+        }
+        return seconds - 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [isMatching]);
 
   async function handleAuth(e) {
     e.preventDefault();
@@ -140,7 +162,27 @@ function App() {
     }
   }
 
-  const currentMessages = useMemo(() => [...messages, ...sent], [sent]);
+  const currentMessages = useMemo(() => {
+    const starters = {
+      Maya: [
+        { side: "them", text: "hey 👋", time: "now" },
+        { side: "them", text: "what part of the world are you from?", time: "now" }
+      ],
+      Alex: [
+        { side: "them", text: "yo 👋", time: "now" },
+        { side: "them", text: "what are you into?", time: "now" }
+      ],
+      Amara: [
+        { side: "them", text: "hey.", time: "now" },
+        { side: "them", text: "tell me something interesting.", time: "now" }
+      ],
+      Kabelo: [
+        { side: "them", text: "aye 😂", time: "now" },
+        { side: "them", text: "random chat or deep chat?", time: "now" }
+      ]
+    };
+    return [...(starters[person.name] ?? starters.Maya), ...sent];
+  }, [person.name, sent]);
 
   const nav = [
     ["home", "house", "Home"],
@@ -153,17 +195,28 @@ function App() {
   ];
 
   function nextPerson() {
-    setDiscoverIndex(v => v + 1);
+    if (isMatching) return;
     setLiked(false);
+    setSent([]);
+    setMessage("");
     navigateTo("random");
+    setIsMatching(true);
   }
 
   function sendMessage(e) {
     e.preventDefault();
+    if (isMatching) return;
     const trimmed = message.trim();
     if (!trimmed) return;
     setSent(v => [...v, { side: "me", text: trimmed, time: "now" }]);
     setMessage("");
+    window.setTimeout(() => {
+      setSent(v => [...v, {
+        side: "them",
+        text: trimmed.toLowerCase().includes("where") ? `I'm from ${person.country} 👀` : "haha I hear you 😂",
+        time: "now"
+      }]);
+    }, 900);
   }
 
   return (
@@ -230,49 +283,63 @@ function App() {
 
           {page === "random" && (
             <section className="chat-page">
-              <div className="chat-header">
-                <div className="person-mini">
-                  <div className="mini-avatar" style={{background: person.gradient}}>{person.name[0]}</div>
-                  <div><strong>{person.name}_482</strong><span><i /> {person.country}</span></div>
+              {isMatching ? (
+                <div className="matching-stage">
+                  <div className="matching-orbit"><span /><i /><b /></div>
+                  <span className="eyebrow">GO ELSEWHR</span>
+                  <h2>Finding someone for you.</h2>
+                  <p>Give it a moment. Your next conversation is loading.</p>
+                  <div className="matching-count">{matchSeconds}<span>sec</span></div>
+                  <div className="matching-bar"><span style={{ width: `${((5 - matchSeconds) / 5) * 100}%` }} /></div>
+                  <button className="secondary" onClick={() => setIsMatching(false)}>STAY HERE</button>
                 </div>
-                <div className="chat-header-actions">
-                  <button onClick={() => setShowCall("voice")}><Icon name="phone" size={14} /> Voice</button>
-                  <button onClick={() => setShowCall("video")}><Icon name="video" size={14} /> Video</button>
-                  <button aria-label="More options"><Icon name="ellipsis" size={16} /></button>
-                </div>
-              </div>
-
-              <div className="chat-body">
-                <div className="chat-intro">
-                  <div className="large-avatar" style={{background: person.gradient}}>{person.name[0]}</div>
-                  <h2>{person.name}_482</h2>
-                  <div className="meta">{person.flag} {person.country} · {person.vibe}</div>
-                  <div className="tags">{person.tags.map(tag => <span key={tag}>{tag}</span>)}</div>
-                </div>
-
-                <div className="message-stack">
-                  {currentMessages.map((m, i) => (
-                    <div key={i} className={`message-row ${m.side}`}>
-                      <div className="bubble">{m.text}<small>{m.time}</small></div>
+              ) : (
+                <>
+                  <div className="chat-header">
+                    <div className="person-mini">
+                      <div className="mini-avatar" style={{background: person.gradient}}>{person.name[0]}</div>
+                      <div><strong>{person.name}_482</strong><span><i /> {person.country}</span></div>
                     </div>
-                  ))}
-                </div>
-              </div>
+                    <div className="chat-header-actions">
+                      <button onClick={() => setShowCall("voice")}><Icon name="phone" size={14} /> Voice</button>
+                      <button onClick={() => setShowCall("video")}><Icon name="video" size={14} /> Video</button>
+                      <button aria-label="More options"><Icon name="ellipsis" size={16} /></button>
+                    </div>
+                  </div>
 
-              <form className="composer" onSubmit={sendMessage}>
-                <button type="button" aria-label="Emoji"><Icon name="smile" size={17} /></button>
-                <button type="button" title="Images"><Icon name="image" size={17} /></button>
-                <button type="button" title="Voice note"><Icon name="mic" size={17} /></button>
-                <input value={message} onChange={e => setMessage(e.target.value)} placeholder="Message..." />
-                <button className="send" aria-label="Send" type="submit"><Icon name="send" size={16} /></button>
-              </form>
+                  <div className="chat-body">
+                    <div className="chat-intro">
+                      <div className="large-avatar" style={{background: person.gradient}}>{person.name[0]}</div>
+                      <h2>{person.name}_482</h2>
+                      <div className="meta">{person.flag} {person.country} · {person.vibe}</div>
+                      <div className="tags">{person.tags.map(tag => <span key={tag}>{tag}</span>)}</div>
+                    </div>
 
-              <div className="chat-actions">
-                <button className="next-button" onClick={nextPerson}><Icon name="refresh-cw" size={15} /> NEXT</button>
-                <button className={liked ? "liked" : ""} onClick={() => setLiked(v => !v)}><Icon name="heart" size={15} /> {liked ? "SAVED" : "SAVE"}</button>
-                <button onClick={() => setShowReport(true)}><Icon name="flag" size={15} /> REPORT</button>
-                <button onClick={() => navigateTo("home")}><Icon name="log-out" size={15} /> LEAVE</button>
-              </div>
+                    <div className="message-stack">
+                      {currentMessages.map((m, i) => (
+                        <div key={i} className={`message-row ${m.side}`}>
+                          <div className="bubble">{m.text}<small>{m.time}</small></div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <form className="composer" onSubmit={sendMessage}>
+                    <button type="button" aria-label="Emoji"><Icon name="smile" size={17} /></button>
+                    <button type="button" title="Images"><Icon name="image" size={17} /></button>
+                    <button type="button" title="Voice note"><Icon name="mic" size={17} /></button>
+                    <input value={message} onChange={e => setMessage(e.target.value)} placeholder="Message..." />
+                    <button className="send" aria-label="Send" type="submit"><Icon name="send" size={16} /></button>
+                  </form>
+
+                  <div className="chat-actions">
+                    <button className="next-button" onClick={nextPerson} disabled={isMatching}><Icon name="refresh-cw" size={15} /> NEXT</button>
+                    <button className={liked ? "liked" : ""} onClick={() => setLiked(v => !v)}><Icon name="heart" size={15} /> {liked ? "SAVED" : "SAVE"}</button>
+                    <button onClick={() => setShowReport(true)}><Icon name="flag" size={15} /> REPORT</button>
+                    <button onClick={() => navigateTo("home")}><Icon name="log-out" size={15} /> LEAVE</button>
+                  </div>
+                </>
+              )}
             </section>
           )}
 
