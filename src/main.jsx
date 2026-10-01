@@ -14,9 +14,13 @@ import {
   leaveRoom,
   listConnections,
   listDiscoverProfiles,
+  listMessageRequests,
   listMessages,
   listRooms,
   reportUser,
+  sendMessageRequest,
+  acceptMessageRequest,
+  denyMessageRequest,
   sendTextMessage,
   editTextMessage,
   deleteMessageForMe,
@@ -111,6 +115,11 @@ function App() {
   const [attachmentBusy, setAttachmentBusy] = useState(false);
   const [notificationPanel, setNotificationPanel] = useState(false);
   const [notifications, setNotifications] = useState([]);
+  const [messageRequests, setMessageRequests] = useState([]);
+  const [messageRequestTarget, setMessageRequestTarget] = useState(null);
+  const [messageRequestText, setMessageRequestText] = useState("");
+  const [messageRequestBusy, setMessageRequestBusy] = useState(false);
+  const [conversationSearch, setConversationSearch] = useState("");
   const [editingMessageId, setEditingMessageId] = useState(null);
   const [replyToMessage, setReplyToMessage] = useState(null);
   const [openMessageActionsId, setOpenMessageActionsId] = useState(null);
@@ -240,6 +249,22 @@ function App() {
   }, [activeMessages]);
 
   const messageRooms = rooms.filter(room => room.kind === "direct");
+  const pendingMessageRequests = messageRequests.filter(request =>
+    request.status === "pending" && request.receiver_id === authUser?.id
+  );
+  const outgoingMessageRequests = messageRequests.filter(request =>
+    request.status === "pending" && request.sender_id === authUser?.id
+  );
+  const filteredMessageRooms = useMemo(() => {
+    const query = conversationSearch.trim().toLowerCase();
+    if (!query) return messageRooms;
+    return messageRooms.filter(room => {
+      const other = room.members?.find(member => member.user_id !== authUser?.id)?.profile;
+      const name = personName(other).toLowerCase();
+      const last = (room.latest_message?.body || "").toLowerCase();
+      return name.includes(query) || last.includes(query);
+    });
+  }, [messageRooms, conversationSearch, authUser?.id]);
   const groupRooms = rooms.filter(room => room.kind === "group");
   const activeOther = activeRoom?.members?.find(member => member.user_id !== authUser?.id)?.profile ?? null;
   const activeConnection = activeOther
@@ -284,14 +309,16 @@ function App() {
     if (!authUser || !supabase) return;
     setDataError("");
     try {
-      const [people, nextConnections, nextRooms] = await Promise.all([
+      const [people, nextConnections, nextRooms, nextRequests] = await Promise.all([
         listDiscoverProfiles(authUser.id),
         listConnections(authUser.id),
         listRooms(authUser.id),
+        listMessageRequests(authUser.id),
       ]);
       setDiscoverPeople(people);
       setConnections(nextConnections);
       setRooms(nextRooms);
+      setMessageRequests(nextRequests);
 
       const liveMatching = isMatchingRef.current;
       const liveMatchingSince = matchingSinceRef.current;
@@ -372,18 +399,37 @@ function App() {
       setToast("Add a photo, name and age first. You can skip the extras.");
       return;
     }
-    setDataBusy(true);
-    try {
-      const roomId = await findOrCreateDirectRoom(person.id);
-      const full = await getRoom(roomId);
-      setCurrentRoom(full);
-      setActiveMessages(await listMessages(roomId, authUser.id));
-      navigateTo("messages");
-    } catch (error) {
-      setDataError(error.message || "Conversation could not be opened.");
-    } finally {
-      setDataBusy(false);
+
+    const existingConnection = connections.find(connection => connection.person?.id === person.id);
+    if (existingConnection?.status === "accepted") {
+      setDataBusy(true);
+      try {
+        const roomId = await findOrCreateDirectRoom(person.id);
+        const full = await getRoom(roomId);
+        setCurrentRoom(full);
+        setActiveMessages(await listMessages(roomId, authUser.id));
+        navigateTo("messages");
+      } catch (error) {
+        setDataError(error.message || "Conversation could not be opened.");
+      } finally {
+        setDataBusy(false);
+      }
+      return;
     }
+
+    const existingRequest = messageRequests.find(request =>
+      request.status === "pending" &&
+      request.sender_id === authUser.id &&
+      request.receiver_id === person.id
+    );
+    if (existingRequest) {
+      navigateTo("messages");
+      setToast("Message request already sent.");
+      return;
+    }
+
+    setMessageRequestTarget(person);
+    setMessageRequestText("");
   }
 
   async function startRandomMatch() {
@@ -778,6 +824,60 @@ function App() {
     }
   }
 
+  async function handleSendMessageRequest(event) {
+    event.preventDefault();
+    if (!authUser || !messageRequestTarget || !messageRequestText.trim()) return;
+    setMessageRequestBusy(true);
+    setDataError("");
+    try {
+      await sendMessageRequest(messageRequestTarget.id, messageRequestText.trim());
+      const targetName = personName(messageRequestTarget);
+      setMessageRequestTarget(null);
+      setMessageRequestText("");
+      await refreshAll();
+      navigateTo("messages");
+      setToast("Message request sent to " + targetName + ".");
+    } catch (error) {
+      setDataError(error.message || "Message request could not be sent.");
+    } finally {
+      setMessageRequestBusy(false);
+    }
+  }
+
+  async function handleAcceptMessageRequest(request) {
+    if (!request?.id) return;
+    setDataBusy(true);
+    setDataError("");
+    try {
+      const roomId = await acceptMessageRequest(request.id);
+      await refreshAll();
+      const full = await getRoom(roomId);
+      setCurrentRoom(full);
+      setActiveMessages(await listMessages(roomId, authUser.id));
+      navigateTo("messages");
+      setToast("Request accepted. Your conversation is open.");
+    } catch (error) {
+      setDataError(error.message || "Message request could not be accepted.");
+    } finally {
+      setDataBusy(false);
+    }
+  }
+
+  async function handleDenyMessageRequest(requestId) {
+    if (!requestId) return;
+    setDataBusy(true);
+    setDataError("");
+    try {
+      await denyMessageRequest(requestId);
+      await refreshAll();
+      setToast("Message request declined.");
+    } catch (error) {
+      setDataError(error.message || "Message request could not be declined.");
+    } finally {
+      setDataBusy(false);
+    }
+  }
+
   async function handleConnectionStatus(connectionId, status) {
     try {
       const result = await updateConnection(connectionId, status);
@@ -998,6 +1098,33 @@ function App() {
               icon: "heart",
               action: "connections",
               sourceId: "connection-accepted-" + row.id + "-" + row.updated_at,
+            });
+          }
+        }
+        await refreshAll();
+      })
+      .on("postgres_changes", { event: "*", schema: "public", table: "message_requests" }, async (payload) => {
+        const row = payload?.new;
+        if (!disposed && row) {
+          if (payload.eventType === "INSERT" && row.receiver_id === authUser.id && row.status === "pending") {
+            addNotification({
+              type: "message_request",
+              title: "New message request",
+              body: row.body || "Someone wants to start a conversation.",
+              action: "messages",
+              icon: "message-circle-plus",
+              sourceId: "message-request-" + row.id,
+            });
+          }
+          if (payload.eventType === "UPDATE" && row.sender_id === authUser.id && row.status !== "pending") {
+            addNotification({
+              type: "message_request",
+              title: row.status === "accepted" ? "Message request accepted" : "Message request declined",
+              body: row.status === "accepted" ? "You can now chat with them." : "The request was declined.",
+              roomId: row.status === "accepted" ? row.room_id : null,
+              action: "messages",
+              icon: row.status === "accepted" ? "message-circle" : "message-circle-off",
+              sourceId: "message-request-response-" + row.id + "-" + row.status,
             });
           }
         }
@@ -1503,108 +1630,154 @@ function App() {
 
             {page === "messages" && (
               <section className="messages-page">
-                <div className="section-heading">
+                <div className="section-heading messages-page-heading">
                   <div>
                     <span className="eyebrow">MESSAGES</span>
                     <h2>Your conversations.</h2>
                   </div>
-                  <span className="messages-count">{messageRooms.length} saved</span>
+                  <span className="messages-count">{messageRooms.length} chats{pendingMessageRequests.length ? " · " + pendingMessageRequests.length + " request" + (pendingMessageRequests.length === 1 ? "" : "s") : ""}</span>
                 </div>
 
-                {messageRooms.length ? (
-                  <div className={"messages-layout " + (activeRoom ? "has-active-chat" : "")}>
-                    <aside className="conversation-sidebar">
-                      <div className="conversation-sidebar-head">
-                        <span className="eyebrow">PEOPLE YOU TALKED TO</span>
-                        <small>{messageRooms.length}</small>
+                <div className={"messages-layout whatsapp-layout " + (activeRoom ? "has-active-chat" : "")}>
+                  <aside className="conversation-sidebar">
+                    <div className="conversation-sidebar-head">
+                      <div>
+                        <span className="eyebrow">CHATS</span>
+                        <strong>{messageRooms.length || "No"} conversation{messageRooms.length === 1 ? "" : "s"}</strong>
                       </div>
-                      <div className="conversation-list">
-                        {messageRooms.map(room => {
-                          const other = room.members?.find(member => member.user_id !== authUser.id)?.profile;
-                          const selected = activeRoom?.id === room.id;
-                          const last = room.latest_message;
-                          return (
-                            <button className={"conversation-item " + (selected ? "selected" : "")} key={room.id} onClick={() => openRoom(room.id)}>
+                      <small>{messageRooms.length}</small>
+                    </div>
+
+                    <label className="conversation-search">
+                      <Icon name="search" size={15} />
+                      <input value={conversationSearch} onChange={event => setConversationSearch(event.target.value)} placeholder="Search conversations" />
+                    </label>
+
+                    {pendingMessageRequests.length > 0 && (
+                      <div className="message-request-inbox">
+                        <div className="message-request-inbox-head">
+                          <div>
+                            <span className="eyebrow">MESSAGE REQUESTS</span>
+                            <strong>{pendingMessageRequests.length} waiting</strong>
+                          </div>
+                          <span className="request-count">{pendingMessageRequests.length}</span>
+                        </div>
+                        <div className="message-request-list">
+                          {pendingMessageRequests.map(request => (
+                            <article className="message-request-card" key={request.id}>
+                              <button type="button" className="message-request-person" onClick={() => setViewedProfile(request.person)}>
+                                <div className="conn-avatar real-small-avatar" style={request.person?.primary_photo_url ? { backgroundImage: "url(" + request.person.primary_photo_url + ")" } : undefined}>
+                                  {!request.person?.primary_photo_url && initials(request.person || { display_name: "E" })}
+                                </div>
+                                <span>
+                                  <strong>{personName(request.person)}</strong>
+                                  <small>{request.body}</small>
+                                </span>
+                              </button>
+                              <div className="message-request-actions">
+                                <button className="primary-mini" disabled={dataBusy} onClick={() => handleAcceptMessageRequest(request)}>ACCEPT</button>
+                                <button className="secondary-mini" disabled={dataBusy} onClick={() => handleDenyMessageRequest(request.id)}>DENY</button>
+                              </div>
+                            </article>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {outgoingMessageRequests.length > 0 && (
+                      <div className="outgoing-request-strip">
+                        <Icon name="send" size={13} />
+                        <span>{outgoingMessageRequests.length} message request{outgoingMessageRequests.length === 1 ? "" : "s"} awaiting a reply.</span>
+                      </div>
+                    )}
+
+                    <div className="conversation-list">
+                      {filteredMessageRooms.length ? filteredMessageRooms.map(room => {
+                        const other = room.members?.find(member => member.user_id !== authUser.id)?.profile;
+                        const selected = activeRoom?.id === room.id;
+                        const last = room.latest_message;
+                        return (
+                          <button className={"conversation-item messenger-conversation " + (selected ? "selected" : "")} key={room.id} onClick={() => openRoom(room.id)}>
+                            <div className="conversation-avatar-wrap">
                               <div className="conn-avatar real-small-avatar" style={other?.primary_photo_url ? { backgroundImage: "url(" + other.primary_photo_url + ")" } : undefined}>
                                 {!other?.primary_photo_url && initials(other || { username: room.kind })}
                               </div>
-                              <div className="conversation-copy">
-                                <strong>{room.kind === "random" ? personName(other) : room.title || personName(other)}</strong>
-                                <span>{last?.body || "No messages yet."}</span>
-                              </div>
-                              <small>{timeLabel(last?.created_at || room.created_at)}</small>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </aside>
-
-                    <div className="conversation-stage">
-                      {activeRoom ? (
-                        <>
-                          <button className="conversation-mobile-back" type="button" onClick={() => {
-                            setCurrentRoom(null);
-                            setActiveMessages([]);
-                          }}>
-                            <Icon name="arrow-left" size={14} /> All conversations
+                              {other?.online && <i className="conversation-online-dot" />}
+                            </div>
+                            <div className="conversation-copy">
+                              <strong>{room.kind === "random" ? personName(other) : room.title || personName(other)}</strong>
+                              <span>{last?.body || (last?.media_name ? "Attachment" : "Start a conversation.")}</span>
+                            </div>
+                            <small>{timeLabel(last?.created_at || room.created_at)}</small>
                           </button>
-                          <LiveChat
-                            activeRoom={activeRoom}
-                            activeOther={activeOther}
-                            activeConnection={activeConnection}
-                            activeMessages={activeMessages}
-                            authUser={authUser}
-                            message={message}
-                            setMessage={setMessage}
-                            editingMessageId={editingMessageId}
-                            replyToMessage={replyToMessage}
-                            openMessageActionsId={openMessageActionsId}
-                            openReactionId={openReactionId}
-                            onConnect={handleConnect}
-                            onViewProfile={person => setViewedProfile(person)}
-                            onSend={handleSendMessage}
-                            onSendAttachment={handleSendAttachment}
-                            attachmentBusy={attachmentBusy}
-                            onNotify={addNotification}
-                            onStartReply={startReply}
-                            onStartEdit={startEdit}
-                            onCancelEdit={cancelMessageEdit}
-                            onDeleteForMe={handleDeleteForMe}
-                            onDeleteForEveryone={handleDeleteForEveryone}
-                            onReact={handleMessageReaction}
-                            onCopy={handleCopyMessage}
-                            onToggleMessageActions={id => {
-                              setOpenMessageActionsId(current => current === id ? null : id);
-                              setOpenReactionId(null);
-                            }}
-                            onToggleReactionPicker={id => {
-                              setOpenReactionId(current => current === id ? null : id);
-                              setOpenMessageActionsId(null);
-                            }}
-                            onReport={() => setShowReport(true)}
-                            onMenu={() => setShowChatMenu(value => !value)}
-                            onLeave={handleLeaveRoom}
-                          />
-                        </>
-                      ) : (
-                        <div className="conversation-placeholder">
-                          <div className="empty-icon"><Icon name="message-square-more" size={22} /></div>
-                          <span className="eyebrow">SELECT A CONVERSATION</span>
-                          <h3>Choose someone.</h3>
-                          <p>Your conversations stay here. Selecting one opens the chat without leaving Messages.</p>
+                        );
+                      }) : (
+                        <div className="conversation-list-empty">
+                          <Icon name="search-x" size={18} />
+                          <span>{conversationSearch ? "No conversations match your search." : "Your accepted chats will appear here."}</span>
                         </div>
                       )}
                     </div>
+                  </aside>
+
+                  <div className="conversation-stage messenger-stage">
+                    {activeRoom ? (
+                      <>
+                        <button className="conversation-mobile-back" type="button" onClick={() => {
+                          setCurrentRoom(null);
+                          setActiveMessages([]);
+                        }}>
+                          <Icon name="arrow-left" size={14} /> All conversations
+                        </button>
+                        <LiveChat
+                          activeRoom={activeRoom}
+                          activeOther={activeOther}
+                          activeConnection={activeConnection}
+                          activeMessages={activeMessages}
+                          authUser={authUser}
+                          message={message}
+                          setMessage={setMessage}
+                          editingMessageId={editingMessageId}
+                          replyToMessage={replyToMessage}
+                          openMessageActionsId={openMessageActionsId}
+                          openReactionId={openReactionId}
+                          onConnect={handleConnect}
+                          onViewProfile={person => setViewedProfile(person)}
+                          onSend={handleSendMessage}
+                          onSendAttachment={handleSendAttachment}
+                          attachmentBusy={attachmentBusy}
+                          onNotify={addNotification}
+                          onStartReply={startReply}
+                          onStartEdit={startEdit}
+                          onCancelEdit={cancelMessageEdit}
+                          onDeleteForMe={handleDeleteForMe}
+                          onDeleteForEveryone={handleDeleteForEveryone}
+                          onReact={handleMessageReaction}
+                          onCopy={handleCopyMessage}
+                          onToggleMessageActions={id => {
+                            setOpenMessageActionsId(current => current === id ? null : id);
+                            setOpenReactionId(null);
+                          }}
+                          onToggleReactionPicker={id => {
+                            setOpenReactionId(current => current === id ? null : id);
+                            setOpenMessageActionsId(null);
+                          }}
+                          onReport={() => setShowReport(true)}
+                          onMenu={() => setShowChatMenu(value => !value)}
+                          onLeave={handleLeaveRoom}
+                        />
+                      </>
+                    ) : (
+                      <div className="conversation-placeholder messenger-empty">
+                        <div className="messenger-empty-orb"><Icon name="message-circle-heart" size={28} /></div>
+                        <span className="eyebrow">YOUR MESSAGES</span>
+                        <h3>Pick a conversation.</h3>
+                        <p>Choose a chat, accept a request, or discover someone new.</p>
+                        <button className="secondary" onClick={() => navigateTo("discover")}>DISCOVER PEOPLE</button>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="empty-state">
-                    <div className="empty-icon"><Icon name="message-circle" size={23} /></div>
-                    <span className="eyebrow">MESSAGES</span>
-                    <h2>No conversations yet.</h2>
-                    <p>People you talk to will appear here. Random conversations become saved chats when you connect.</p>
-                    <button className="primary" onClick={() => navigateTo("discover")}>DISCOVER PEOPLE</button>
-                  </div>
-                )}
+                </div>
               </section>
             )}
 
@@ -1803,6 +1976,41 @@ function App() {
                 <Icon name="heart" size={15} /> CONNECT
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {messageRequestTarget && (
+        <div className="modal-backdrop" onMouseDown={() => !messageRequestBusy && setMessageRequestTarget(null)}>
+          <div className="modal message-request-modal" onMouseDown={event => event.stopPropagation()}>
+            <div className="modal-top">
+              <span className="eyebrow">MESSAGE REQUEST</span>
+              <button onClick={() => !messageRequestBusy && setMessageRequestTarget(null)} aria-label="Close"><Icon name="x" size={16} /></button>
+            </div>
+            <div className="request-target-head">
+              <div className="conn-avatar large-request-avatar" style={messageRequestTarget.primary_photo_url ? { backgroundImage: "url(" + messageRequestTarget.primary_photo_url + ")" } : undefined}>
+                {!messageRequestTarget.primary_photo_url && initials(messageRequestTarget)}
+              </div>
+              <div>
+                <span className="eyebrow">YOU'RE MESSAGING</span>
+                <h2>{personName(messageRequestTarget)}</h2>
+                <small>{messageRequestTarget.country || "ELSEWHR member"}</small>
+              </div>
+            </div>
+            <p className="modal-copy">This person has to accept your first message before the conversation becomes a normal chat.</p>
+            <form className="message-request-form" onSubmit={handleSendMessageRequest}>
+              <label>
+                <span>Your first message</span>
+                <textarea value={messageRequestText} onChange={event => setMessageRequestText(event.target.value)} maxLength={2000} rows="5" placeholder="Say something worth replying to..." autoFocus required />
+              </label>
+              <div className="request-form-footer">
+                <small>{messageRequestText.length}/2000</small>
+                <div>
+                  <button type="button" className="secondary" disabled={messageRequestBusy} onClick={() => setMessageRequestTarget(null)}>CANCEL</button>
+                  <button type="submit" className="primary" disabled={messageRequestBusy || !messageRequestText.trim()}>{messageRequestBusy ? "SENDING..." : "SEND REQUEST"}</button>
+                </div>
+              </div>
+            </form>
           </div>
         </div>
       )}
