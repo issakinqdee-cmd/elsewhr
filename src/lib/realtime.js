@@ -141,6 +141,56 @@ export async function listRooms(currentUserId) {
   }));
 }
 
+export async function listMessageRequests(currentUserId) {
+  const client = await requireSupabase();
+  const { data, error } = await client
+    .from("message_requests")
+    .select("id, sender_id, receiver_id, body, status, room_id, created_at, responded_at")
+    .or(`sender_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`)
+    .order("created_at", { ascending: false })
+    .limit(100);
+  if (error) throw error;
+
+  const ids = [...new Set((data ?? []).flatMap(row => [row.sender_id, row.receiver_id]).filter(Boolean))];
+  if (!ids.length) return [];
+
+  const { data: profiles, error: profileError } = await client
+    .from("profiles")
+    .select("id, username, display_name, age, country, languages, interests, bio, primary_photo_url, verified_at, updated_at")
+    .in("id", ids);
+  if (profileError) throw profileError;
+
+  const byId = new Map((profiles ?? []).map(profile => [profile.id, profile]));
+  return (data ?? []).map(row => ({
+    ...row,
+    person: byId.get(row.sender_id === currentUserId ? row.receiver_id : row.sender_id) ?? null,
+  })).filter(row => row.person);
+}
+
+export async function sendMessageRequest(targetUserId, body) {
+  const client = await requireSupabase();
+  const { data, error } = await client.rpc("send_message_request", {
+    target_user: targetUserId,
+    request_body: body,
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function acceptMessageRequest(requestId) {
+  const client = await requireSupabase();
+  const { data, error } = await client.rpc("accept_message_request", { request_id: requestId });
+  if (error) throw error;
+  return data;
+}
+
+export async function denyMessageRequest(requestId) {
+  const client = await requireSupabase();
+  const { data, error } = await client.rpc("deny_message_request", { request_id: requestId });
+  if (error) throw error;
+  return data;
+}
+
 export async function getRoom(roomId) {
   const client = await requireSupabase();
   const { data: room, error } = await client
