@@ -2666,3 +2666,385 @@ body,
   .request-form-footer{align-items:flex-end}
   .request-form-footer>div{flex-wrap:wrap;justify-content:flex-end}
 }
+
+
+/* Responsive scaling pass
+   Keeps dense desktop layouts from becoming cramped on tablets and small laptops. */
+html{
+  overflow-x:hidden;
+}
+body{
+  overflow-x:hidden;
+}
+img,
+video,
+canvas,
+svg{
+  max-width:100%;
+}
+button,
+input,
+textarea,
+select{
+  max-width:100%;
+}
+
+@media (max-width:1180px) and (min-width:901px){
+  .discover-page,
+  .simple-page,
+  .messages-page{
+    padding-left:clamp(24px,4vw,48px);
+    padding-right:clamp(24px,4vw,48px);
+  }
+
+  .discover-layout{
+    grid-template-columns:minmax(0,1fr);
+  }
+
+  .discover-side{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+
+  .profile-photo{
+    height:clamp(360px,42vw,430px);
+  }
+
+  .connection-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+
+  .room-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+
+  .room-create-card{
+    grid-template-columns:1.4fr 1fr;
+  }
+
+  .message-room-grid{
+    grid-template-columns:1fr;
+  }
+
+  .whatsapp-layout,
+  .messages-layout{
+    grid-template-columns:280px minmax(0,1fr);
+  }
+}
+
+@media (max-width:1100px) and (min-width:901px){
+  .hero-page{
+    padding-left:clamp(28px,5vw,72px);
+    padding-right:clamp(28px,5vw,72px);
+  }
+
+  .topbar{
+    padding-left:20px;
+    padding-right:20px;
+  }
+
+  .messages-page{
+    padding-left:28px;
+    padding-right:28px;
+  }
+
+  .whatsapp-layout,
+  .messages-layout{
+    grid-template-columns:1fr;
+    height:auto;
+    min-height:calc(100vh - 185px);
+  }
+
+  .whatsapp-layout .conversation-sidebar{
+    min-height:360px;
+    max-height:48vh;
+    border-right:0;
+    border-bottom:1px solid var(--theme-border);
+  }
+
+  .whatsapp-layout.has-active-chat .conversation-sidebar{
+    display:none;
+  }
+
+  .whatsapp-layout.has-active-chat .conversation-stage{
+    min-height:calc(100vh - 185px);
+  }
+
+  .messenger-stage>.live-chat{
+    height:calc(100vh - 185px);
+  }
+}
+
+@media (max-width:900px){
+  .content{
+    overflow-x:hidden;
+  }
+
+  .topbar{
+    min-width:0;
+  }
+
+  .top-actions{
+    min-width:0;
+    gap:7px;
+  }
+
+  .mobile-brand{
+    min-width:0;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+
+  .hero-page{
+    min-height:calc(100vh - 72px);
+    padding-top:48px;
+    padding-bottom:56px;
+  }
+
+  .discover-page,
+  .simple-page,
+  .messages-page,
+  .games-page{
+    width:100%;
+    max-width:none;
+    padding-left:clamp(18px,5vw,32px);
+    padding-right:clamp(18px,5vw,32px);
+  }
+
+  .discover-layout{
+    width:100%;
+  }
+
+  .discover-side{
+    width:100%;
+  }
+
+  .profile-card,
+  .empty-state,
+  .games-intro,
+  .whatsapp-layout{
+    width:100%;
+    max-width:100%;
+  }
+
+  .profile-photo{
+    height:clamp(320px,58vw,430px);
+  }
+
+  .messages-page{
+    min-height:calc(100vh - 72px);
+  }
+
+  .whatsapp-layout,
+  .messages-layout{
+    width:100%;
+  }
+
+  .conversation-sidebar,
+  .conversation-stage{
+    min-width:0;
+  }
+}
+
+@media (max-width:620px){
+  body{
+    min-width:0;
+  }
+
+  .topbar{
+    height:64px;
+    padding:0 12px;
+  }
+
+  .content,
+  .messages-page{
+    min-height:calc(100vh - 64px);
+  }
+
+  .hero-page{
+    min-height:calc(100vh - 64px);
+    padding:44px 18px 48px;
+  }
+
+  .hero-page h1{
+    width:100%;
+    max-width:100%;
+    font-size:clamp(42px,13vw,54px);
+  }
+
+  .hero-page p{
+    width:100%;
+    max-width:100%;
+    font-size:14px;
+  }
+
+  .hero-grid{
+    margin-top:44px;
+    width:100%;
+  }
+
+  .section-heading h2,
+  .simple-page h2{
+    max-width:100%;
+    font-size:clamp(30px,9vw,44px);
+  }
+
+  .profile-photo{
+    height:min(112vw,390px);
+    min-height:280px;
+  }
+
+  .profile-info{
+    padding:18px;
+  }
+
+  .name-line{
+    align-items:flex-start;
+  }
+
+  .connection-grid,
+  .room-grid,
+  .coming-grid{
+    width:100%;
+  }
+
+  .connection-card{
+    min-width:0;
+  }
+
+  .room-create-card{
+    grid-template-columns:1fr;
+  }
+
+  .modal-backdrop{
+    padding:12px;
+  }
+
+  .modal{
+    width:100%;
+    max-width:100%;
+    max-height:calc(100vh - 24px);
+    overflow:auto;
+    border-radius:19px;
+  }
+
+  .call-modal{
+    width:100%;
+    max-width:100%;
+  }
+
+  .call-stage{
+    height:min(56vh,330px);
+  }
+
+  .whatsapp-layout,
+  .messages-layout{
+    min-height:calc(100vh - 122px);
+  }
+
+  .whatsapp-layout.has-active-chat .conversation-stage{
+    min-height:calc(100vh - 122px);
+  }
+
+  .messenger-stage>.live-chat{
+    height:calc(100vh - 122px);
+  }
+
+  .messenger-stage .chat-header{
+    padding:11px 12px;
+  }
+
+  .messenger-stage .chat-body{
+    padding-top:16px;
+    padding-bottom:10px;
+  }
+
+  .messenger-stage .bubble{
+    max-width:min(86%, 520px);
+  }
+
+  .messenger-stage .composer{
+    padding:8px 9px;
+  }
+
+  .messenger-stage .composer input{
+    min-width:0;
+    height:38px;
+  }
+
+  .message-request-modal{
+    width:100%;
+  }
+
+  .request-target-head h2{
+    font-size:22px!important;
+  }
+
+  .notification-popover{
+    right:8px;
+    width:calc(100vw - 16px);
+  }
+
+  .minimized-game-dock{
+    right:10px;
+    bottom:72px;
+    width:calc(100vw - 20px);
+  }
+
+  .game-grid,
+  .games-grid{
+    width:100%;
+  }
+}
+
+@media (max-width:380px){
+  .topbar{
+    padding:0 9px;
+  }
+
+  .top-actions{
+    gap:5px;
+  }
+
+  .avatar-button{
+    width:30px;
+    height:30px;
+  }
+
+  .notification-button{
+    width:32px;
+    height:32px;
+  }
+
+  .hero-page{
+    padding-left:15px;
+    padding-right:15px;
+  }
+
+  .discover-page,
+  .simple-page,
+  .messages-page,
+  .games-page{
+    padding-left:14px;
+    padding-right:14px;
+  }
+
+  .section-heading{
+    gap:14px;
+  }
+
+  .conversation-sidebar-head{
+    padding-left:12px;
+    padding-right:12px;
+  }
+
+  .message-request-inbox{
+    margin-left:7px;
+    margin-right:7px;
+  }
+
+  .outgoing-request-strip{
+    margin-left:9px;
+    margin-right:9px;
+  }
+}
