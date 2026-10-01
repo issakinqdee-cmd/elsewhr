@@ -265,6 +265,7 @@ function App() {
       return name.includes(query) || last.includes(query);
     });
   }, [messageRooms, conversationSearch, authUser?.id]);
+  const onlineDiscoverCount = discoverPeople.filter(person => person.online).length;
   const groupRooms = rooms.filter(room => room.kind === "group");
   const activeOther = activeRoom?.members?.find(member => member.user_id !== authUser?.id)?.profile ?? null;
   const activeConnection = activeOther
@@ -1525,11 +1526,18 @@ function App() {
 
             {page === "discover" && (
               <section className="discover-page">
-                <div className="section-heading">
-                  <div><span className="eyebrow">DISCOVER</span><h2>Real people, right now.</h2></div>
-                  <div className="filter-row">
-                    <label><input type="checkbox" checked={discoverOnlineOnly} onChange={e => setDiscoverOnlineOnly(e.target.checked)} /> Online</label>
-                    <label><input type="checkbox" checked={discoverVerifiedOnly} onChange={e => setDiscoverVerifiedOnly(e.target.checked)} /> Verified</label>
+                <div className="section-heading discover-heading">
+                  <div>
+                    <span className="eyebrow">DISCOVER</span>
+                    <h2>Real people, right now.</h2>
+                    <p className="discover-subline">{onlineDiscoverCount || "No"} online now · {visiblePeople.length} profiles visible</p>
+                  </div>
+                  <div className="discover-heading-tools">
+                    <div className="discover-live-chip"><i /> LIVE</div>
+                    <div className="filter-row">
+                      <label><input type="checkbox" checked={discoverOnlineOnly} onChange={e => setDiscoverOnlineOnly(e.target.checked)} /> Online</label>
+                      <label><input type="checkbox" checked={discoverVerifiedOnly} onChange={e => setDiscoverVerifiedOnly(e.target.checked)} /> Verified</label>
+                    </div>
                   </div>
                 </div>
 
@@ -1568,13 +1576,29 @@ function App() {
                         </div>
                       </div>
                     </div>
-                    <div className="discover-side">
-                      <div className="quote-card">
-                        <span>LIVE PROFILE</span>
-                        <strong>{currentDiscoverPerson.online ? "Available right now." : "Recently active."}</strong>
-                        <small>Last profile update {timeLabel(currentDiscoverPerson.updated_at)}</small>
+                    <aside className="discover-side">
+                      <div className="discover-live-panel">
+                        <div className="discover-live-panel-head">
+                          <span className="eyebrow">LIVE PROFILE</span>
+                          <span className={currentDiscoverPerson.online ? "live-state active" : "live-state"}><i /> {currentDiscoverPerson.online ? "AVAILABLE" : "RECENTLY ACTIVE"}</span>
+                        </div>
+                        <div className="discover-position">
+                          <strong>{String((visiblePeople.indexOf(currentDiscoverPerson) + 1) || 1).padStart(2, "0")}</strong>
+                          <span>/ {String(visiblePeople.length || 1).padStart(2, "0")} PROFILES</span>
+                        </div>
+                        <p>{currentDiscoverPerson.online ? "They are active on ELSEWHR right now." : "They were recently active. Keep exploring."}</p>
+                        <div className="discover-stat-grid">
+                          <div><strong>{visiblePeople.length}</strong><span>VISIBLE</span></div>
+                          <div><strong>{onlineDiscoverCount}</strong><span>ONLINE</span></div>
+                        </div>
+                        <small className="discover-updated">Profile updated {timeLabel(currentDiscoverPerson.updated_at)}</small>
                       </div>
-                    </div>
+                      <div className="quote-card discover-quote-card">
+                        <span>KEEP EXPLORING</span>
+                        <strong>There is always someone somewhere.</strong>
+                        <small>Use the buttons below the profile to pass, connect, or start a message request.</small>
+                      </div>
+                    </aside>
                   </div>
                 ) : (
                   <div className="empty-state">
@@ -1634,8 +1658,12 @@ function App() {
                   <div>
                     <span className="eyebrow">MESSAGES</span>
                     <h2>Your conversations.</h2>
+                    <p className="messages-subline">{messageRooms.length} active chat{messageRooms.length === 1 ? "" : "s"} · {onlineDiscoverCount} people online</p>
                   </div>
-                  <span className="messages-count">{messageRooms.length} chats{pendingMessageRequests.length ? " · " + pendingMessageRequests.length + " request" + (pendingMessageRequests.length === 1 ? "" : "s") : ""}</span>
+                  <div className="messages-head-meta">
+                    <span className="messages-live-chip"><i /> {onlineDiscoverCount} ONLINE</span>
+                    <span className="messages-request-chip">{pendingMessageRequests.length} REQUEST{pendingMessageRequests.length === 1 ? "" : "S"}</span>
+                  </div>
                 </div>
 
                 <div className={"messages-layout whatsapp-layout " + (activeRoom ? "has-active-chat" : "")}>
